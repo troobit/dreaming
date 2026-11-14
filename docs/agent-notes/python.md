@@ -13,3 +13,6 @@
 - Validate packaged data through an installed wheel outside the checkout.
   Source-tree imports alone do not verify that SQL, JSON Schema and licence
   resources ship correctly.
+- For a UTF-8 token estimate, serialize the entire JSON payload before counting
+  bytes. `len(str)` counts code points; escaping, metadata and envelopes also
+  consume input space. Preserve original entry indices when filtering records.

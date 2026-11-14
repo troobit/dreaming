@@ -5,6 +5,11 @@ provides the installable `dream` command, private SQLite storage, configuration
 snapshots, backend capability probes, and an apsis shared-json client. The
 remaining pipeline is tracked in [the spec](specs/dreaming/tasks.md).
 
+The Sessions library phase adds scoped incremental selection, thread deduplication,
+context-sized reader parts, attribution and session registration. Its reversible
+forget/restore operations exclude evidence from support and ranking while keeping
+stored data. These operations will be exposed through the later CLI/API phase.
+
 Requires Python 3.12+, uv, and Git on a local POSIX filesystem. Install with
 `make install`, or use `uv run dream` during development.
 

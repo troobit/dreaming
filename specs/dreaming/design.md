@@ -161,6 +161,24 @@ Any `dream` invocation that would resume a run takes the same non-blocking lock.
 
 ### Selection and reading (`sessions.py`, 1.x–3.x)
 
+Sessions implementation assumptions (2026-11-14): timestamps with no recorded
+zone are unavailable for date filtering; unknown modification times do not
+invent a recent-file exclusion. Explicit dates filter start time (inclusive
+lower bound, exclusive upper bound). Selection is read-only; recording skips
+and advancing read cursors are explicit operations after planning/reading.
+Git worktrees map through their common Git directory to the parent repository;
+missing paths retain their recorded project. Entry locations are zero-based
+`entry:N`, since apsis entry IDs need not be unique. Splitting measures the
+serialized reader payload with the labelled UTF-8-bytes/4 estimate, including
+its envelope, after reserving prompt and output space for the smallest reader
+fallback context. Registered shared-json files are referenced at their original
+path and validated on each read, without copying transcripts. An additive
+migration records those paths and explicit call-to-session input dependencies;
+later runner code must record these dependencies before making each call.
+Pending-reassessment flags form the queue for the later reviewer. Eligibility
+is computed from current support, so forgetting/restoring never rewrites an
+item's retained status or an already-applied change.
+
 - Listing comes from apsis; rows already read (store: session id, lens versions, entry count read) are dropped unless 1.4 applies. Growth under unchanged lens versions selects only entries after the recorded count (2.5).
 - Sessions of the dream in progress (calls table `session_ref`, LM Studio `thread_id == run id`) and sessions modified inside the recent window are excluded (1.5). Sessions from earlier dreams are tagged `subject=dreaming`; their observations feed only the dream-behaviour lens and never count as evidence about the sessions those dreams processed.
 - Duplicates are matched by `thread_id` from the session document; the harness copy supplies content, the LM Studio log supplies server metadata, or truncated content when it is the only copy (2.4). Unattributed server warnings go to the report only.

@@ -10,7 +10,8 @@
   worktrees, and an ambiguous Git failure. `ensure_home` enforces mode 0700;
   the database is mode 0600 and its resolved path is checked separately.
 - `Store` uses WAL, foreign keys, a five-second busy timeout, autocommit, and
-  explicit short transactions. The schema covers the design's 17 tables.
+  explicit short transactions. The original schema covers the design's 17 tables;
+  migration 2 adds registered-document paths and call input lineage.
   Migrations only create tables/indexes or add columns, run atomically, and
   refuse while a running/waiting/interrupted/partial run exists.
 - `sessions.py` consumes apsis shared-json v1, validates against the vendored

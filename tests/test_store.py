@@ -24,6 +24,7 @@ TABLES = {
     "learning",
     "replays",
     "currency_findings",
+    "session_inputs",
 }
 
 
@@ -31,7 +32,7 @@ def test_schema_and_private_wal_store(tmp_path):
     with Store(tmp_path / "private") as store:
         conn = store.connection
         assert TABLES <= {r[0] for r in conn.execute("SELECT name FROM sqlite_master")}
-        assert conn.execute("PRAGMA user_version").fetchone()[0] == 1
+        assert conn.execute("PRAGMA user_version").fetchone()[0] == len(MIGRATIONS)
         assert conn.execute("PRAGMA journal_mode").fetchone()[0] == "wal"
         assert conn.execute("PRAGMA busy_timeout").fetchone()[0] == 5000
         assert conn.execute("PRAGMA foreign_keys").fetchone()[0] == 1
@@ -47,14 +48,14 @@ def test_migration_blocked_names_unfinished_run(tmp_path, state):
     home = tmp_path / "private"
     with Store(home) as store:
         store.connection.execute("INSERT INTO runs(id, status) VALUES ('unfinished', ?)", (state,))
-    extra = (*MIGRATIONS, Migration(2, "ALTER TABLE runs ADD COLUMN extra TEXT;"))
+    extra = (*MIGRATIONS, Migration(len(MIGRATIONS) + 1, "ALTER TABLE runs ADD COLUMN extra TEXT;"))
     with pytest.raises(MigrationBlocked, match="migration_blocked.*unfinished"):
         Store(home, migrations=extra)
     with Store(home) as store:
-        assert store.connection.execute("PRAGMA user_version").fetchone()[0] == 1
+        assert store.connection.execute("PRAGMA user_version").fetchone()[0] == len(MIGRATIONS)
         store.connection.execute("UPDATE runs SET status='complete'")
     with Store(home, migrations=extra) as store:
-        assert store.connection.execute("PRAGMA user_version").fetchone()[0] == 2
+        assert store.connection.execute("PRAGMA user_version").fetchone()[0] == len(extra)
         assert store.connection.execute("SELECT id, extra FROM runs").fetchone() == (
             "unfinished",
             None,
@@ -68,19 +69,23 @@ def test_failed_migration_is_atomic(tmp_path):
     broken = (
         *MIGRATIONS,
         Migration(
-            2, "ALTER TABLE runs ADD COLUMN extra TEXT;\nCREATE TABLE runs (duplicate TEXT);"
+            len(MIGRATIONS) + 1,
+            "ALTER TABLE runs ADD COLUMN extra TEXT;\nCREATE TABLE runs (duplicate TEXT);",
         ),
     )
     with pytest.raises(sqlite3.OperationalError):
         Store(home, migrations=broken)
     with Store(home) as store:
         assert "extra" not in {r[1] for r in store.connection.execute("PRAGMA table_info(runs)")}
-        assert store.connection.execute("PRAGMA user_version").fetchone()[0] == 1
+        assert store.connection.execute("PRAGMA user_version").fetchone()[0] == len(MIGRATIONS)
 
 
 def test_destructive_migration_refused(tmp_path):
     with pytest.raises(StoreError, match="additive"):
-        Store(tmp_path / "private", migrations=(*MIGRATIONS, Migration(2, "DROP TABLE runs;")))
+        Store(
+            tmp_path / "private",
+            migrations=(*MIGRATIONS, Migration(len(MIGRATIONS) + 1, "DROP TABLE runs;")),
+        )
 
 
 def test_newer_database_refused(tmp_path):
@@ -122,3 +127,22 @@ def test_database_symlink_cannot_write_into_repository(tmp_path):
     with pytest.raises(ConfigError):
         Store(home)
     assert not target.exists()
+
+
+def test_session_migration_preserves_foundation_data_and_blocks_unfinished_run(tmp_path):
+    home = tmp_path / "private"
+    with Store(home, migrations=MIGRATIONS[:1]) as store:
+        store.connection.execute("INSERT INTO runs(id,status) VALUES ('old','running')")
+        store.connection.execute(
+            "INSERT INTO sessions_seen(source,session_id,entries_read) "
+            "VALUES ('claude','original',12)"
+        )
+    with pytest.raises(MigrationBlocked, match="old"):
+        Store(home)
+    with Store(home, migrations=MIGRATIONS[:1]) as store:
+        store.connection.execute("UPDATE runs SET status='complete'")
+    with Store(home) as store:
+        assert store.connection.execute(
+            "SELECT entries_read,document_path FROM sessions_seen"
+        ).fetchone() == (12, None)
+        assert store.connection.execute("SELECT COUNT(*) FROM session_inputs").fetchone()[0] == 0

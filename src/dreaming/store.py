@@ -25,7 +25,10 @@ class Migration:
     sql: str
 
 
-MIGRATIONS = (Migration(1, files("dreaming").joinpath("schema.sql").read_text()),)
+MIGRATIONS = (
+    Migration(1, files("dreaming").joinpath("schema.sql").read_text()),
+    Migration(2, files("dreaming").joinpath("session_migration.sql").read_text()),
+)
 UNFINISHED = ("running", "waiting", "interrupted", "partial")
 
 

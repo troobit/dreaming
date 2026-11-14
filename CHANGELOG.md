@@ -8,6 +8,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- Scoped incremental session selection, thread deduplication with server metadata, and reader parts sized for the smallest fallback context with explicit truncation and stable source locations.
+- Session attribution and idempotent registration of identifiers or shared-json files, with automated prompt classification and late-registration reassessment.
+- Reversible session forgetting across source copies, live support and ranking filters, immediate withholding when support is insufficient, and call input lineage for excluding derived dream evidence.
 - Installable Python 3.12+ `dream` command with uv packaging, Makefile checks, and isolated wheel-install verification.
 - Private storage outside Git repositories, with a WAL SQLite schema, explicit transactions, and atomic additive migrations blocked by unfinished runs.
 - Validated TOML configuration, versioned scoped lenses, and snapshots pinned to committed default-branch instructions without copying private names.
