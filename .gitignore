@@ -1,0 +1,3 @@
+specs/**/.orbit
+.worktrees/**
+specs/**/comparison-report
