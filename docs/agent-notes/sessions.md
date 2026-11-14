@@ -13,7 +13,8 @@
 - `record_selection` persists parse failures separately. Call
   `mark_read(store, selected, config)` only after the complete session succeeds;
   it records source copies and their separate cursors in one short transaction.
-  Partial-step checkpoints belong to the later run engine. No Git subprocess
+  Read steps checkpoint individual parts and commit the final cursor with their
+  observations using `mark_read(..., conn=conn)`. No Git subprocess
   runs inside these write transactions.
 - `reader_document` rechecks forgetting and registration immediately before a
   call. `reader_parts` uses it and the smallest configured reader fallback
@@ -25,7 +26,10 @@
   sources enter selection even outside normal apsis discovery. Registration
   applies across known source copies, changes automated prompt observations to
   `tool_prompt`, preserves explicitly quoted user entries, and flags dependent
-  items `pending_reassessment`. That flag is the later reviewer's durable queue.
+  items `pending_reassessment`. That flag is the reviewer's durable queue.
+  Observations keep canonical `entry:N` plus `source_entry_id` so registration
+  by a source's original id still works. User-confirmed outcomes are rechecked
+  against registration in the live view; automated prompts cannot confirm use.
 - `knowledge.py` supplies live observation, pattern/ranking, retrieval-support
   and adoption-support views. Forget/restore flags every known thread copy in
   one transaction, queues dependent items and keeps all data and retained
@@ -36,6 +40,6 @@
   This allows `blocked_call_refs` to exclude derived transcripts and run records
   transitively when their input is forgotten. Recheck live views before every
   call/adoption; never cache them across calls. Applied changes are untouched.
-- These are library operations. CLI/API wiring, knowledge refinement, reports,
+- These are library operations. CLI/API wiring, reports,
   rate measurement and replay execution remain later phases. Their queries
   must use the live exclusion views rather than read evidence tables directly.

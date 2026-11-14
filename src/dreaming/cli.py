@@ -31,6 +31,11 @@ def main(argv: list[str] | None = None) -> int:
     status = commands.add_parser("status", help="Inspect a recorded run")
     status.add_argument("run_id", nargs="?")
     status.add_argument("--plan", action="store_true")
+    trial = commands.add_parser("trial", help="Measure a reader backend without store writes")
+    trials = trial.add_subparsers(dest="trial_role", required=True)
+    reader = trials.add_parser("reader")
+    reader.add_argument("--backend", required=True)
+    reader.add_argument("--sessions", type=int, default=10)
     args = parser.parse_args(argv)
     try:
         if args.command == "probe":
@@ -38,6 +43,17 @@ def main(argv: list[str] | None = None) -> int:
             from dreaming.backends.probe import probe_config
 
             return probe_config(config, dry_run=args.dry_run, names=args.backend)
+        if args.command == "trial":
+            from dreaming.trial import run_trial
+
+            result = run_trial(
+                load_config(args.config),
+                home_path(),
+                backend_name=args.backend,
+                max_sessions=args.sessions,
+            )
+            print(json.dumps(result))
+            return 0
         if args.command == "run":
             from dreaming.plan import dry_run
             from dreaming.sessions import SessionScope

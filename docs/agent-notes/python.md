@@ -29,3 +29,8 @@
   small chunks. Carry one monotonic deadline through discovery and completion,
   reset the socket timeout to the remaining time at each stage, and use `read1`
   to regain control between chunks. Bound the accumulated body separately.
+- Scrub structured JSON values recursively rather than applying credential
+  regexes to JSON syntax. This preserves parseability and multiline strings;
+  redaction markers must themselves remain unchanged on a second pass.
+- Compare aware source timestamps as datetimes when finding the latest support;
+  ISO strings with different timezone offsets do not sort chronologically.

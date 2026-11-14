@@ -14,3 +14,9 @@ Use existing pattern identifiers for assignments and merges. Propose research
 questions or changes only with evidence identifiers, and identify insufficient
 evidence instead of inventing support. The program enforces distinct-session
 thresholds, outcome confirmation, scopes, revision limits and dispositions.
+
+Use approach_worked for a claim that an approach succeeded, so the program can
+require a confirmed successful outcome. Keep empty scope dimensions to inherit
+source context; missing context is unresolved. For merge_items supply the
+base_versions of every source item as well as the target's base_version. Reassess
+items marked needs_revalidation, retaining uncertainty when outcomes are absent.

@@ -7,6 +7,7 @@ It is MIT licensed; see APSIS-LICENSE.txt. Update the schema and contract fixtur
 import json
 import os
 import subprocess
+from contextlib import nullcontext
 from dataclasses import asdict, dataclass, fields, replace
 from datetime import UTC, datetime, timedelta
 from importlib.resources import files
@@ -570,9 +571,9 @@ def record_selection(store: Store, selection: Selection) -> None:
             )
 
 
-def mark_read(store: Store, session: SelectedSession, config: Config) -> None:
+def mark_read(store: Store, session: SelectedSession, config: Config, *, conn=None) -> None:
     attr = session.attribution or attribute_session(session.document, store, config)
-    with store.transaction() as conn:
+    with nullcontext(conn) if conn is not None else store.transaction() as conn:
         if any(s["forgotten"] for s in _copy_states(store, session.copies)):
             raise SessionError("forgotten", "Session was forgotten before reading completed")
         attr = _apply_registrations(attr, _registrations(store, session.copies), config)
@@ -930,8 +931,8 @@ def register_session(
                 "project=COALESCE(?,project) WHERE source=? AND session_id=?",
                 (workflow, project, *key),
             )
-            for oid, entry_id, location, kind in conn.execute(
-                "SELECT id,entry_id,source_location,kind FROM observations "
+            for oid, entry_id, location, kind, source_entry in conn.execute(
+                "SELECT id,entry_id,source_location,kind,source_entry_id FROM observations "
                 "WHERE source=? AND session_id=?",
                 key,
             ).fetchall():
@@ -939,7 +940,7 @@ def register_session(
                 if kind in {"user_statement", "tool_prompt"}:
                     new_kind = (
                         "user_statement"
-                        if entry_id in quote_ids or location in quote_ids
+                        if {entry_id, location, source_entry} & quote_ids
                         else "tool_prompt"
                     )
                     conn.execute(

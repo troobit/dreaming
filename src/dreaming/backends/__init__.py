@@ -15,6 +15,7 @@ from jsonschema import ValidationError, validate
 from dreaming.backends.probe import ProbeResult
 from dreaming.budget import RunBudget
 from dreaming.config import Config
+from dreaming.sessions import SessionError
 from dreaming.steps import CallResult, Steps
 from dreaming.store import Store
 
@@ -161,6 +162,7 @@ class Dispatcher:
         *,
         sessions: tuple[tuple[str, str], ...] = (),
         input_ref: str | None = None,
+        checkpoint=None,
     ) -> CallResult:
         # An answer saved before a crash is reapplied, never regenerated.
         saved = self.steps.saved_output(key)
@@ -240,6 +242,15 @@ class Dispatcher:
                         validate(json.loads(response.raw_output), schema)
                     except (ValueError, ValidationError) as exc:
                         response = replace(response, outcome="schema_failure", error=str(exc))
+                if response.outcome == "success" and checkpoint is not None:
+                    try:
+                        response = replace(response, raw_output=checkpoint(response, name))
+                    except SessionError as exc:
+                        if exc.code not in {"forgotten", "forgotten_input"}:
+                            raise
+                        response = replace(
+                            response, raw_output="", outcome="input_rejected", error=exc.code
+                        )
                 reset = (
                     usage_reset(response.error or response.raw_output, self.wall_clock())
                     if response.outcome != "success"
@@ -249,6 +260,8 @@ class Dispatcher:
                     response = replace(response, outcome="usage_limit")
                 self.steps.record_call(ref, response)
                 self.budget.checkpoint()
+                if response.outcome == "input_rejected":
+                    return response
                 if response.outcome == "context_changed":
                     return response
                 if response.outcome == "success":

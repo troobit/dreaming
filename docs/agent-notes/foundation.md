@@ -37,8 +37,9 @@
   `spawn_agent` in a read-only `debug prompt-input` check with the proposed
   suppression flags. Treat this as a failed isolation probe, not proof that a
   flag works. Authenticated model-call probes remain opt-in.
-- Current public CLI commands are `--version`, `probe`, `run --dry-run` and
-  `status [--plan]`. Complete dream execution has later tasks. Backend adapters,
+- Current public CLI commands are `--version`, `probe`, `run --dry-run`,
+  `status [--plan]` and `trial reader --backend NAME --sessions N`. Complete
+  dream execution has later tasks. Backend adapters,
   direct tool-free LM Studio probing/calls, role definitions, versioned
   installation and the bootstrap launcher are available as library operations.
 

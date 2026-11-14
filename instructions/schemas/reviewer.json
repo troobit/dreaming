@@ -159,6 +159,13 @@
               "reason": {
                 "type": "string",
                 "minLength": 1
+              },
+              "base_versions": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "integer",
+                  "minimum": 1
+                }
               }
             },
             "required": [
@@ -166,7 +173,8 @@
               "item_ids",
               "target_id",
               "base_version",
-              "reason"
+              "reason",
+              "base_versions"
             ],
             "additionalProperties": false
           },
@@ -248,7 +256,8 @@
             "lesson",
             "workflow",
             "learning",
-            "currency"
+            "currency",
+            "approach_worked"
           ]
         },
         "scope": {

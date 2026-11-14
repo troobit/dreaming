@@ -8,6 +8,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- Verified and redacted observation checkpoints with stable evidence identifiers, source locations, attribution gates, confirmed outcomes, and source-availability markers.
+- Resumable reader and reviewer steps with deterministic clustering, bounded review context, scoped knowledge promotion and revision history, protected corrections and dismissals, ranking, reassessment, and atomic research/author follow-ups.
+- Read-only `dream trial reader --backend NAME --sessions N` calibration reporting schema validity, quote matches, and token usage without changing the user's store.
 - Recorded backend dispatch with bounded retries, fallback, schema validation, circuit breaking, resumable provider-limit waits, and shared engine budget accounting.
 - Isolated Claude Code and Codex adapters with role-scoped MCP filtering, stdin prompts, session/model attribution, retained exec streams, and agent-launch termination.
 - Direct tool-free LM Studio calls with loaded-instance context checks, early thread metadata, optional authentication, and structured-output fallback.

@@ -91,15 +91,15 @@ def test_reviewer_has_only_bounded_summaries_and_evidence_ids(tmp_path):
     config = load_config(tmp_path / "config.toml")
     config = replace(
         config,
-        backends={"a": BackendConfig(context_tokens=4096), "b": BackendConfig(context_tokens=2048)},
+        backends={"a": BackendConfig(context_tokens=4096), "b": BackendConfig(context_tokens=3072)},
         roles={**config.roles, "reviewer": ("a", "b")},
     )
     roles = RoleSet(INSTRUCTIONS, config)
     request = roles.build(
         "reviewer", summaries=[{"summary": "x" * 1000, "evidence_ids": ["e"]} for _ in range(20)]
     )
-    assert request.context_tokens == 2048
-    assert request.estimated_tokens <= 2048 - request.output_tokens
+    assert request.context_tokens == 3072
+    assert request.estimated_tokens <= 3072 - request.output_tokens
     assert request.omitted_count > 0
     assert "evidence_ids" in request.prompt
     with pytest.raises(ValueError, match="transcript"):

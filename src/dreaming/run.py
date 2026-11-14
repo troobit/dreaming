@@ -28,6 +28,7 @@ from dreaming.config import (
     write_snapshot,
 )
 from dreaming.redact import redact
+from dreaming.sessions import SessionError
 from dreaming.steps import CallResult, Step, Steps, insert_steps
 from dreaming.store import Store, snapshot_connection
 
@@ -383,7 +384,17 @@ class Engine:
                 or (self.dispatcher is not None and hasattr(handler, "prepare"))
             ):
                 exhausted |= self.budget.exhausted()
-                metadata = handler.prepare(step)
+                context_before = None
+                if self.dispatcher is not None and hasattr(handler, "resize"):
+                    context_before = self.dispatcher.context_limit(handler.role)
+                    handler.resize(context_before)
+                try:
+                    metadata = handler.prepare(step)
+                except SessionError as exc:
+                    if exc.code not in {"forgotten", "forgotten_input"}:
+                        raise
+                    self.steps.apply(step.key, '{"omitted":"forgotten"}', lambda conn, output: None)
+                    continue
                 sessions = metadata.get("sessions", ())
                 if not self.budget.can_call(metadata["role"], key=step.key, sessions=sessions):
                     exhausted |= metadata["role"] == "reader" and self.budget.read_limit_reached(
@@ -393,19 +404,33 @@ class Engine:
                     self.steps.apply(step.key, '{"omitted":"budget"}', lambda conn, output: None)
                     continue
                 if self.dispatcher is not None:
-                    response = self.dispatcher.dispatch(step.key, **metadata)
+                    try:
+                        response = self.dispatcher.dispatch(step.key, **metadata)
+                    except SessionError as exc:
+                        if exc.code not in {"forgotten", "forgotten_input"}:
+                            raise
+                        continue
                 else:
                     ref = self.steps.begin_call(step.key, **metadata)
                     response: CallResult = handler.call(step)
                     self.steps.record_call(ref, response)
                 self.budget.checkpoint()
+                if response.outcome == "context_changed" and context_before is not None:
+                    if self.dispatcher.context_limit(handler.role) < context_before:
+                        continue
                 if response.outcome == "budget_exhausted":
                     exhausted = True
                     self.steps.apply(step.key, '{"omitted":"budget"}', lambda conn, output: None)
                     continue
                 if response.outcome == "interrupted":
                     return "interrupted"
+                if response.outcome == "input_rejected":
+                    self.steps.apply(step.key, '{"omitted":"forgotten"}', lambda conn, output: None)
+                    continue
                 if response.outcome == "schema_failure":
+                    if hasattr(handler, "failed"):
+                        with self.store.transaction() as conn:
+                            handler.failed(conn, step, "schema_failure")
                     self.steps.apply(
                         step.key, '{"omitted":"schema_failure"}', lambda conn, output: None
                     )

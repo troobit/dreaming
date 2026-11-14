@@ -14,3 +14,10 @@ evidence. For earlier dreams, observe only dreaming's own behaviour. Mark an
 outcome success or failure only with cited user or check evidence; otherwise
 use unknown. A tool failure alone does not establish a user learning gap.
 Return an empty observations array when there is no supported finding.
+
+Use learning_goal only for an explicit user-stated goal; requests for help use
+learning. An optional scope may record a scope explicitly declared in an asserted
+user statement. Use global only when the user explicitly applies it globally;
+otherwise omit scope and the program retains the source context. Cite outcome
+evidence with entry:N locations; a check needs a recorded tool_result exit_code,
+success or is_error field. Assistant statements never confirm an outcome.

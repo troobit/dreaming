@@ -17,9 +17,12 @@
   budget exhaustion. A call dispatched without a saved response is indeterminate
   and stops as partial instead of generating a second answer. An optional
   `Dispatcher` owns each attempt's call rows and shares the engine's budget and
-  interrupt flag. Its handler `prepare` returns role, prompt, schema, tools and
-  optional lineage; a handler with `apply` only remains model-free. The complete
-  observation/knowledge pipeline is added by later tasks.
+  interrupt flag. Its handler `prepare` returns role, prompt, schema, tools,
+  optional lineage and a checkpoint callback. The callback verifies reader
+  quotes before redaction and persistence. Read/Review handlers are available;
+  researcher, author and public start/API wiring remain later tasks.
+  Handlers with `resize` receive the smallest live fallback context; a reduced
+  model context resizes the pending input before retrying.
 - Budgets sum every recorded attempt. Active seconds checkpoint at step/call/wait
   boundaries; waits and downtime do not count. A hard kill loses time since the
   last checkpoint. Readers preserve reserved tokens and a distinct-session cap;

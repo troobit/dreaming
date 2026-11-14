@@ -41,7 +41,12 @@
               "tool_use",
               "skill_use",
               "reference",
-              "context_weight"
+              "context_weight",
+              "user_statement",
+              "tool_prompt",
+              "assistant_suggestion",
+              "tool_result",
+              "learning_goal"
             ]
           },
           "modality": {
@@ -82,6 +87,43 @@
               "tool",
               "dreaming"
             ]
+          },
+          "scope": {
+            "type": "object",
+            "properties": {
+              "domains": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "projects": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "workflows": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "global": {
+                "type": "boolean"
+              },
+              "unresolved": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "domains",
+              "projects",
+              "workflows",
+              "global",
+              "unresolved"
+            ],
+            "additionalProperties": false
           }
         },
         "required": [

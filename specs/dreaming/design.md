@@ -292,6 +292,18 @@ Exit codes follow screw except for budget exhaustion: 0 success (including `budg
 
 ## Risks and Assumptions
 
+- Observation/knowledge portability (2026-11-15): source locations use canonical
+  `entry:N` identifiers even when a source repeats or omits its own entry ids.
+  The dispatcher verifies reader quotes against unredacted source entries before
+  saving a redacted, program-verified checkpoint; recovery applies that checkpoint
+  and rechecks live exclusion/attribution. Observation topic and source attribution
+  are stored separately. Optional declared scopes require asserted user evidence;
+  otherwise knowledge keeps its source scope or remains unresolved. Reader trials
+  use an in-memory store and never write probe caches or call/session records.
+  Credential categories were inspected in agentic-coding `scripts/review_html/redact.py`
+  at `5d07d2f7f31675709f57b35579f72058e846fa67`; that revision declares no licence,
+  so expressions are independently written without copying source. No runtime
+  dependency on that checkout is introduced; redaction coverage lives in tests.
 - Backend portability (2026-11-15): adapters require a successful capability probe
   for their installed harness version and use its confirmed flags; an incompatible
   backend remains unavailable. Shared MCP definitions are passed explicitly to
