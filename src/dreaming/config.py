@@ -406,7 +406,11 @@ def load_config(path: Path | None = None, *, overrides: dict | None = None) -> C
 
 
 def load_lenses(path: Path) -> tuple[Lens, ...]:
-    raw = _read_toml(path).get("lenses", [])
+    return parse_lenses(_read_toml(path))
+
+
+def parse_lenses(document: dict) -> tuple[Lens, ...]:
+    raw = document.get("lenses", [])
     if not isinstance(raw, list):
         raise ConfigError("lenses must be an array of tables")
     result = []
@@ -445,22 +449,9 @@ def read_names(config: Config) -> tuple[str, ...]:
 def write_snapshot(config: Config, home: Path, run_id: str) -> Path:
     if not re.fullmatch(r"[A-Za-z0-9_-]+", run_id):
         raise ConfigError("Invalid run id")
-    if config.instruction_repo is None:
-        raise ConfigError("Configure instructions.repository before starting a run")
     read_names(config)  # Validate access without copying the contents.
     repo = config.instruction_repo
-    branch = config.default_branch
-    if branch is None:
-        for candidate in ("refs/remotes/origin/HEAD", "refs/heads/main", "refs/heads/master"):
-            try:
-                git(repo, "rev-parse", "--verify", candidate)
-                branch = candidate
-                break
-            except ConfigError:
-                continue
-    if branch is None:
-        raise ConfigError("Cannot determine instruction repository's default branch")
-    revision = git(repo, "rev-parse", "--verify", f"{branch}^{{commit}}")
+    branch, revision = instruction_revision(config)
     env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
 
     def content(*args):
@@ -502,11 +493,7 @@ def write_snapshot(config: Config, home: Path, run_id: str) -> Path:
         (temporary / "config.json").write_text(json.dumps(asdict(config), default=str, indent=2))
         (temporary / "manifest.json").write_text(
             json.dumps(
-                {
-                    "instruction_revision": revision,
-                    "instruction_branch": branch,
-                    "run_id": run_id,
-                },
+                {"instruction_revision": revision, "instruction_branch": branch, "run_id": run_id},
                 indent=2,
             )
         )
@@ -515,3 +502,22 @@ def write_snapshot(config: Config, home: Path, run_id: str) -> Path:
         if temporary.exists():
             shutil.rmtree(temporary)
     return destination
+
+
+def instruction_revision(config: Config) -> tuple[str, str]:
+    if config.instruction_repo is None:
+        raise ConfigError("Configure instructions.repository before starting a run")
+    repo = config.instruction_repo
+    branch = config.default_branch
+    if branch is None:
+        for candidate in ("refs/remotes/origin/HEAD", "refs/heads/main", "refs/heads/master"):
+            try:
+                git(repo, "rev-parse", "--verify", candidate)
+                branch = candidate
+                break
+            except ConfigError:
+                continue
+    if branch is None:
+        raise ConfigError("Cannot determine instruction repository's default branch")
+    revision = git(repo, "rev-parse", "--verify", f"{branch}^{{commit}}")
+    return branch, revision

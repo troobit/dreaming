@@ -28,7 +28,8 @@
   output afterward. It records probes under a run id, caches by version and
   backend configuration, and can share a caller's run id and budget. Dry probes
   run only `--version` and read caches. Standalone probes have their own rows;
-  dream locking/resumption belongs to the later Run engine phase.
+  standalone probes are not resumable dreams (they have no snapshot). The Run
+  engine handles locking/resumption for runs with snapshots.
 - `backends/process.py` monitors actual invocation events, not tool definitions,
   kills the process group on agent events/timeouts, and bounds captured output.
   Codex tool namespaces require descending into their `tools` array.
@@ -36,8 +37,9 @@
   `spawn_agent` in a read-only `debug prompt-input` check with the proposed
   suppression flags. Treat this as a failed isolation probe, not proof that a
   flag works. Authenticated model-call probes remain opt-in.
-- Current public CLI commands are `--version` and `probe`; dream execution,
-  version-pinned installation and direct LM Studio calls have later tasks.
+- Current public CLI commands are `--version`, `probe`, `run --dry-run` and
+  `status [--plan]`. Complete dream execution and direct LM Studio calls have
+  later tasks. Versioned installation and the bootstrap launcher are available.
 
 Use Makefile targets for checks. `make test` includes isolated wheel installation
 and import of packaged SQL/schema resources. `make test-live` makes real model

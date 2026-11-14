@@ -8,6 +8,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- Resumable run engine with stable step dependencies, atomic result/follow-up commits, saved call responses, input lineage, token and active-time accounting, reader reserves, detached lock handoff, and interruption recovery.
+- Read-only `dream run --dry-run` selection and backend planning, `dream status --plan` rendering verified with rune, and database inspection that leaves live SQLite files unchanged.
+- Immutable revision installs through `make install`, a launcher that pins unfinished runs to their original version, foreign-command protection, and explicit pruning that retains versions needed by unfinished runs.
 - Scoped incremental session selection, thread deduplication with server metadata, and reader parts sized for the smallest fallback context with explicit truncation and stable source locations.
 - Session attribution and idempotent registration of identifiers or shared-json files, with automated prompt classification and late-registration reassessment.
 - Reversible session forgetting across source copies, live support and ranking filters, immediate withholding when support is insufficient, and call input lineage for excluding derived dream evidence.

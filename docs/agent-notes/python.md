@@ -16,3 +16,12 @@
 - For a UTF-8 token estimate, serialize the entire JSON payload before counting
   bytes. `len(str)` counts code points; escaping, metadata and envelopes also
   consume input space. Preserve original entry indices when filtering records.
+- SQLite `mode=ro` can still create WAL/SHM sidecars or update shared memory.
+  `snapshot_connection` copies a stable DB/WAL pair into a private temporary
+  directory and backs it up into memory for inspections that must change no
+  persistent state. Ignore access times when checking copy stability.
+- A SQLite connection context manager commits/rolls back; it does not close
+  the connection. Close snapshot and temporary connections explicitly.
+- `flock` follows an open-file description shared through `pass_fds`. Closing
+  the parent's descriptor preserves the child's lock; `LOCK_UN` would release
+  it for both. Mark the inherited descriptor non-inheritable in the worker.

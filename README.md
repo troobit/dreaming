@@ -10,8 +10,23 @@ context-sized reader parts, attribution and session registration. Its reversible
 forget/restore operations exclude evidence from support and ranking while keeping
 stored data. These operations will be exposed through the later CLI/API phase.
 
+The Run engine library phase adds transactional steps, durable call responses,
+budget accounting, detached locking, and resume from saved configuration and
+selection. Phase handlers and the complete model pipeline are added by later
+tasks. Preview selection and backend availability with `dream run --dry-run`;
+inspect recorded progress with `dream status` or `dream status --plan`. The plan
+is generated from SQLite for reading with `rune list`.
+
 Requires Python 3.12+, uv, and Git on a local POSIX filesystem. Install with
 `make install`, or use `uv run dream` during development.
+
+Versioned installation requires a clean committed checkout. It installs that
+revision under `DREAMING_HOME/versions/`, switches `current`, and links the
+launcher at `~/.local/bin/dream`. The launcher selects the recorded revision for
+an unfinished run. Existing unrelated commands are refused. Set
+`DREAMING_BIN_DIR` when invoking Make to choose a different launcher directory.
+Old versions remain available; `uv run python -m dreaming.install --prune`
+removes only unused managed versions while no dream holds the run lock.
 
 Copy `instructions/config.example.toml` to `~/.dreaming/config.toml` and set
 the instruction repository and its default branch. `DREAMING_HOME` overrides
@@ -21,6 +36,8 @@ the private data directory, which must be outside every Git repository.
 dream --version
 dream probe --dry-run
 dream probe --backend claude
+dream run --dry-run
+dream status --plan
 ```
 
 `probe --dry-run` checks executable versions and reads cached results without

@@ -120,46 +120,46 @@ references:
 
 ## Run engine
 
-- [ ] 8. Steps, calls, budget, lock and resume <!-- id:w1na5dl -->
+- [x] 8. Steps, calls, budget, lock and resume <!-- id:w1na5dl -->
   - Blocked-by: w1na5d2 (SQLite store and migrations), w1na5d5 (Configuration, lens loading and run snapshot)
   - Stream: 1
   - Requirements: [1.1](requirements.md#1.1), [1.2](requirements.md#1.2), [1.6](requirements.md#1.6), [4.1](requirements.md#4.1), [4.8](requirements.md#4.8), [5.4](requirements.md#5.4), [5.6](requirements.md#5.6), [6.3](requirements.md#6.3), [7.3](requirements.md#7.3), [7.5](requirements.md#7.5)
-  - [ ] 8.1. Write tests for the step table, lock, budget and crash consistency <!-- id:w1na5dm -->
+  - [x] 8.1. Write tests for the step table, lock, budget and crash consistency <!-- id:w1na5dm -->
     - Next ready step by dependencies; follow-up steps inserted in the same transaction as results; raw output stored on the calls row and applied on resume without a model call; lock: the start parent takes a non-blocking flock, the detached child holds it after the parent exits and it is released when the child is killed, a second start exits 4 changing nothing, a spawned model-call or check subprocess does not inherit the descriptor (`close_fds=True`), a resuming invocation that gets the lock kills survivors of the recorded process group first; wall-clock counts only while running and not while the run is `waiting` on a usage limit; budget equals the sum of recorded calls including retries; property: for any crash point and a fake model whose answers differ per call, resume matches an uninterrupted run; the run's own budget or limit ends it as `budget_exhausted`, reports without model calls and exits 0; exit codes 0,1,2,4,5 (5 only for `partial`)
     - Blocked-by: w1na5d2 (SQLite store and migrations), w1na5d5 (Configuration, lens loading and run snapshot)
     - Stream: 1
     - Requirements: [1.1](requirements.md#1.1), [1.2](requirements.md#1.2), [1.6](requirements.md#1.6), [5.4](requirements.md#5.4), [5.6](requirements.md#5.6), [6.3](requirements.md#6.3), [7.5](requirements.md#7.5)
-  - [ ] 8.2. Implement steps.py, budget.py and run.py <!-- id:w1na5dn -->
+  - [x] 8.2. Implement steps.py, budget.py and run.py <!-- id:w1na5dn -->
     - Calls row written before each call; stable runner-assigned step keys; resume keeps selection, remaining budget and overrides and rejects other overrides; run record, interrupted-run detection by flock plus recorded process group (lock file never written or deleted); limits checked only between steps; exit code mapping with `budget_exhausted` as 0 and `partial` as 5
     - Blocked-by: w1na5dm (Write tests for the step table, lock, budget and crash consistency)
     - Stream: 1
     - Requirements: [1.2](requirements.md#1.2), [1.6](requirements.md#1.6), [4.1](requirements.md#4.1), [4.8](requirements.md#4.8), [5.4](requirements.md#5.4), [5.6](requirements.md#5.6), [7.3](requirements.md#7.3), [7.5](requirements.md#7.5)
 
-- [ ] 9. Dry run and rendered plan <!-- id:w1na5do -->
+- [x] 9. Dry run and rendered plan <!-- id:w1na5do -->
   - Blocked-by: w1na5d8 (Probe set for harness isolation and structured output), w1na5df (Session selection, dedupe and splitting), w1na5dl (Steps, calls, budget, lock and resume)
   - Stream: 1
   - Requirements: [1.7](requirements.md#1.7), [5.5](requirements.md#5.5)
-  - [ ] 9.1. Write tests for dry run and the rune-format plan view <!-- id:w1na5dp -->
+  - [x] 9.1. Write tests for dry run and the rune-format plan view <!-- id:w1na5dp -->
     - Dry run lists sessions, backend per role and budget, calls no model and changes no file or row; backend status labelled cached or unprobed; `dream status --plan` renders steps to runs/<id>/tasks-dream.md which real `rune list` parses and which is never read back
     - Blocked-by: w1na5d8 (Probe set for harness isolation and structured output), w1na5df (Session selection, dedupe and splitting), w1na5dl (Steps, calls, budget, lock and resume)
     - Stream: 1
     - Requirements: [1.7](requirements.md#1.7), [5.5](requirements.md#5.5)
-  - [ ] 9.2. Implement `dream run --dry-run` and plan.py <!-- id:w1na5dq -->
+  - [x] 9.2. Implement `dream run --dry-run` and plan.py <!-- id:w1na5dq -->
     - Plan renderer is read-only output; verifies the design assumption that rune parses the rendered file
     - Blocked-by: w1na5dp (Write tests for dry run and the rune-format plan view)
     - Stream: 1
     - Requirements: [1.7](requirements.md#1.7), [5.5](requirements.md#5.5)
 
-- [ ] 10. Versioned installs and launcher <!-- id:w1na5dr -->
+- [x] 10. Versioned installs and launcher <!-- id:w1na5dr -->
   - Blocked-by: w1na5dl (Steps, calls, budget, lock and resume)
   - Stream: 1
   - Requirements: [7.3](requirements.md#7.3)
-  - [ ] 10.1. Write tests for version pinning <!-- id:w1na5ds -->
+  - [x] 10.1. Write tests for version pinning <!-- id:w1na5ds -->
     - Launcher runs `current` for a new run and the recorded revision for resume; a version directory is kept while any unfinished run records it; an adopted change to dreaming code does not alter a running or resumed run
     - Blocked-by: w1na5dl (Steps, calls, budget, lock and resume)
     - Stream: 1
     - Requirements: [7.3](requirements.md#7.3)
-  - [ ] 10.2. Implement `make install` and the launcher <!-- id:w1na5dt -->
+  - [x] 10.2. Implement `make install` and the launcher <!-- id:w1na5dt -->
     - Installs into ~/.dreaming/versions/<revision>/, repoints current, links ~/.local/bin/dream; refuses to overwrite a foreign file
     - Blocked-by: w1na5ds (Write tests for version pinning)
     - Stream: 1

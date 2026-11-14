@@ -292,6 +292,25 @@ Exit codes follow screw except for budget exhaustion: 0 success (including `budg
 
 ## Risks and Assumptions
 
+- Run-engine portability (2026-11-15): the detached worker uses POSIX sessions,
+  `flock` and inherited file descriptors; other subprocesses close descriptors.
+  Steps and their application callbacks are sequential. Call responses are
+  checkpointed before result application; recovery reuses that checkpoint even
+  when the budget is now exhausted. A process death between dispatch and durable
+  response storage is intrinsically ambiguous without backend request recovery:
+  such a call stops as `partial` instead of silently requesting a different answer.
+  Crash-consistency tests cover durable boundaries and rollback during application;
+  they do not claim exactly-once remote execution across this ambiguous interval.
+  Active elapsed time is checkpointed at step/call/wait boundaries, excluding
+  downtime and provider waits; a hard kill can lose the last uncheckpointed interval.
+  The engine exposes phase handlers and a model-free finalizer; model dispatch,
+  the complete pipeline and styled reports are supplied by their later tasks.
+  Dry planning opens an existing database read-only or uses an in-memory schema,
+  and reads committed lenses without creating a snapshot. Installs require a
+  clean committed source tree, use an immutable revision directory and atomically
+  switch `current`; old versions are retained unless explicitly pruned while no
+  run or installation holds the same lock. `make install` and
+  `make install-dreaming` both select this versioned installation.
 - Foundation portability (2026-11-14): implementation also runs in Orbit worktrees; it does not require the checkout's branch to be literally `dreaming`. Private data requires a local POSIX filesystem and Git on PATH; resolved paths are checked for ordinary, worktree and bare repositories before writing. Configuration paths resolve relative to the configuration file. An instruction repository and its default branch may be configured explicitly; otherwise the local remote HEAD or `main`/`master` identifies that branch, without fetching. Snapshots pin that branch to one commit before reading any file. The private names file is validated and read separately, never embedded in snapshots. Live probes require an explicit opt-in and available login/model; normal tests use fake executables and recorded apsis documents. A probe reports unverified capabilities as unavailable rather than inferring isolation from a successful call. The Foundation `make install` installs a standalone wheel through uv; the version-pinned launcher is added by task 10.
 - Risk: harness isolation holds per version | Verify: first implementation task probes each backend and version — `codex debug prompt-input` for Codex, a real exec session for its tool list (the prompt view may ignore feature flags, and `spawn_agent` stayed listed under every flag tried), `claude --safe-mode` with `--mcp-config` and the parent-directory instruction walk from `DREAMING_HOME` for Claude — and confirms apsis finds the call's session | If wrong: the backend is skipped for roles needing isolation (5.5), or for Codex the adapter enforces by killing the call on an agent-launch event; the probe result names the leak.
 - Risk: each harness's structured-output option differs by version | Verify: same probe task | If wrong: take the final message as JSON and rely on program validation alone.

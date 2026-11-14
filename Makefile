@@ -1,4 +1,4 @@
-.PHONY: test test-live lint format build install
+.PHONY: test test-live lint format build install install-dreaming
 
 test:
 	uv run pytest -m 'not live'
@@ -17,5 +17,7 @@ format:
 build:
 	uv build
 
-install:
-	uv tool install .
+install: install-dreaming
+
+install-dreaming:
+	uv run python -m dreaming.install --source . $(if $(DREAMING_BIN_DIR),--bin-dir "$(DREAMING_BIN_DIR)")
