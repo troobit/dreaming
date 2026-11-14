@@ -8,79 +8,79 @@ references:
 
 ## Foundation
 
-- [ ] 1. Scaffold the project and private home on the dreaming branch <!-- id:w1na5cz -->
+- [x] 1. Scaffold the project and private home on the dreaming branch <!-- id:w1na5cz -->
   - Stream: 1
   - Requirements: [6.4](requirements.md#6.4), [14.4](requirements.md#14.4)
-  - [ ] 1.1. Write tests for the private home and CLI entry <!-- id:w1na5d0 -->
+  - [x] 1.1. Write tests for the private home and CLI entry <!-- id:w1na5d0 -->
     - tests/test_home.py: `DREAMING_HOME` created mode 0700; refuses a location inside any git repository; `dream --version` runs from an installed wheel with no checkout of agentic-coding on the path
     - Stream: 1
     - Requirements: [6.4](requirements.md#6.4), [14.4](requirements.md#14.4)
-  - [ ] 1.2. Create the project skeleton and implement the home checks <!-- id:w1na5d1 -->
+  - [x] 1.2. Create the project skeleton and implement the home checks <!-- id:w1na5d1 -->
     - repository root is this checkout on branch `dreaming`; pyproject.toml (Python 3.12+, uv, ruff, pytest, hypothesis), Makefile with `test`, `lint`, `install`, src/dreaming/{cli,config}.py, instructions/ and tests/ directories; no import from agentic-coding
     - Blocked-by: w1na5d0 (Write tests for the private home and CLI entry)
     - Stream: 1
     - Requirements: [6.4](requirements.md#6.4), [14.4](requirements.md#14.4)
 
-- [ ] 2. SQLite store and migrations <!-- id:w1na5d2 -->
+- [x] 2. SQLite store and migrations <!-- id:w1na5d2 -->
   - Blocked-by: w1na5cz (Scaffold the project and private home on the dreaming branch)
   - Stream: 1
   - Requirements: [6.1](requirements.md#6.1), [6.3](requirements.md#6.3), [6.5](requirements.md#6.5), [6.6](requirements.md#6.6), [6.7](requirements.md#6.7), [7.5](requirements.md#7.5), [13.2](requirements.md#13.2), [13.7](requirements.md#13.7), [13.8](requirements.md#13.8)
-  - [ ] 2.1. Write tests for schema, WAL and additive migrations <!-- id:w1na5d3 -->
+  - [x] 2.1. Write tests for schema, WAL and additive migrations <!-- id:w1na5d3 -->
     - Every table in the design Data Models exists, including the `waiting` run status and the wait-until column on `runs`; WAL with busy timeout; migrations are additive and refuse with `migration_blocked` while an unfinished run exists; a second connection can write while a run holds a transaction
     - Blocked-by: w1na5cz (Scaffold the project and private home on the dreaming branch)
     - Stream: 1
     - Requirements: [6.3](requirements.md#6.3), [7.5](requirements.md#7.5)
-  - [ ] 2.2. Implement src/dreaming/store.py <!-- id:w1na5d4 -->
+  - [x] 2.2. Implement src/dreaming/store.py <!-- id:w1na5d4 -->
     - Integer `user_version` migrations; tables runs (status includes `waiting`; wait-until time), steps, sessions_seen, calls, observations, file_findings, research_findings, patterns, knowledge_items, knowledge_revisions, feedback, changes, adoption, registrations, learning, replays, currency_findings; all evidence stored redacted with source-availability markers
     - Blocked-by: w1na5d3 (Write tests for schema, WAL and additive migrations)
     - Stream: 1
     - Requirements: [6.1](requirements.md#6.1), [6.5](requirements.md#6.5), [6.6](requirements.md#6.6), [6.7](requirements.md#6.7), [13.2](requirements.md#13.2), [13.7](requirements.md#13.7), [13.8](requirements.md#13.8)
 
-- [ ] 3. Configuration, lens loading and run snapshot <!-- id:w1na5d5 -->
+- [x] 3. Configuration, lens loading and run snapshot <!-- id:w1na5d5 -->
   - Blocked-by: w1na5cz (Scaffold the project and private home on the dreaming branch)
   - Stream: 1
   - Requirements: [1.2](requirements.md#1.2), [2.2](requirements.md#2.2), [2.3](requirements.md#2.3), [2.9](requirements.md#2.9), [5.1](requirements.md#5.1), [5.2](requirements.md#5.2), [7.1](requirements.md#7.1), [7.3](requirements.md#7.3), [9.12](requirements.md#9.12)
-  - [ ] 3.1. Write tests for config parsing and the start-of-run snapshot <!-- id:w1na5d6 -->
+  - [x] 3.1. Write tests for config parsing and the start-of-run snapshot <!-- id:w1na5d6 -->
     - Instructions read with `git show <default>:instructions/...`, not the working tree; snapshot copied to runs/<id>/snapshot/; names list read only from a path outside every repository and never copied; defaults for budgets, thresholds (including `max_usage_wait` and `fallback_on_usage_limit`, default off, also a start override), tool lists, classification rules and origin mappings; invalid config exits 2
     - Blocked-by: w1na5cz (Scaffold the project and private home on the dreaming branch)
     - Stream: 1
     - Requirements: [7.1](requirements.md#7.1), [7.3](requirements.md#7.3), [9.12](requirements.md#9.12)
-  - [ ] 3.2. Implement src/dreaming/config.py and the snapshot writer <!-- id:w1na5d7 -->
+  - [x] 3.2. Implement src/dreaming/config.py and the snapshot writer <!-- id:w1na5d7 -->
     - TOML config at `~/.dreaming/config.toml`; lenses.toml loader with versions and domain/project/workflow applicability; local/cloud classification and non-interactive origin rules; per-role backend fallback lists and per-run overrides
     - Blocked-by: w1na5d6 (Write tests for config parsing and the start-of-run snapshot)
     - Stream: 1
     - Requirements: [1.2](requirements.md#1.2), [2.2](requirements.md#2.2), [2.3](requirements.md#2.3), [2.9](requirements.md#2.9), [5.1](requirements.md#5.1), [5.2](requirements.md#5.2), [7.1](requirements.md#7.1)
 
-- [ ] 4. Probe set for harness isolation and structured output <!-- id:w1na5d8 -->
+- [x] 4. Probe set for harness isolation and structured output <!-- id:w1na5d8 -->
   - Blocked-by: w1na5cz (Scaffold the project and private home on the dreaming branch)
   - Stream: 1
   - Requirements: [1.7](requirements.md#1.7), [4.4](requirements.md#4.4), [5.5](requirements.md#5.5), [5.7](requirements.md#5.7), [5.8](requirements.md#5.8)
-  - [ ] 4.1. Write tests for the backend probes with fake claude and codex executables <!-- id:w1na5d9 -->
+  - [x] 4.1. Write tests for the backend probes with fake claude and codex executables <!-- id:w1na5d9 -->
     - Probe result records version, tool list, instruction/skill/agent-tool leakage, structured-output option support, whether apsis finds the call's session, and whether the agent-launch tool can be removed; results cached by backend version; a dry run reads only the cache and `--version` and labels results cached or unprobed
     - Blocked-by: w1na5cz (Scaffold the project and private home on the dreaming branch)
     - Stream: 1
     - Requirements: [1.7](requirements.md#1.7), [5.5](requirements.md#5.5)
-  - [ ] 4.2. Implement src/dreaming/backends/probe.py and `dream probe` <!-- id:w1na5da -->
+  - [x] 4.2. Implement src/dreaming/backends/probe.py and `dream probe` <!-- id:w1na5da -->
     - Claude: `--safe-mode` first, then the `--setting-sources ""` set, run from a cwd under DREAMING_HOME. Codex: `codex debug prompt-input` plus a real exec session for the tool list; skills block off; saved `--json` stream registered with apsis. LM Studio via the harness. Probe calls count against the budget and are tagged as the dream's own
     - Blocked-by: w1na5d9 (Write tests for the backend probes with fake claude and codex executables)
     - Stream: 1
     - Requirements: [4.4](requirements.md#4.4), [5.5](requirements.md#5.5), [5.7](requirements.md#5.7), [5.8](requirements.md#5.8)
-  - [ ] 4.3. Add opt-in live probe tests (`make test-live`) <!-- id:w1na5db -->
+  - [x] 4.3. Add opt-in live probe tests (`make test-live`) <!-- id:w1na5db -->
     - Assert the design's assumptions against the installed claude, codex and LM Studio: no ~/.claude or ~/.codex instructions in context, no spawn_agent reachable or enforcement works, apsis opens the session, structured-output flag works; skipped when a tool or login is absent
     - Blocked-by: w1na5da (Implement src/dreaming/backends/probe.py and `dream probe`)
     - Stream: 1
     - Requirements: [4.4](requirements.md#4.4), [5.5](requirements.md#5.5), [5.8](requirements.md#5.8)
 
-- [ ] 5. apsis client and contract checks <!-- id:w1na5dc -->
+- [x] 5. apsis client and contract checks <!-- id:w1na5dc -->
   - Blocked-by: w1na5cz (Scaffold the project and private home on the dreaming branch)
   - Stream: 1
   - Requirements: [2.1](requirements.md#2.1), [2.4](requirements.md#2.4), [3.1](requirements.md#3.1), [3.2](requirements.md#3.2), [3.3](requirements.md#3.3), [3.4](requirements.md#3.4), [3.5](requirements.md#3.5), [12.1](requirements.md#12.1)
-  - [ ] 5.1. Write contract tests against recorded apsis shared-json fixtures <!-- id:w1na5dd -->
+  - [x] 5.1. Write contract tests against recorded apsis shared-json fixtures <!-- id:w1na5dd -->
     - Listing across all projects; session documents for claude, codex, codex-exec, copilot, kiro and lmstudio; thread_id present for LM Studio and Codex-served sessions; provider and origin recorded as the source records them; unknown schema_version rejected; opt-in live variant against installed apsis
     - Blocked-by: w1na5cz (Scaffold the project and private home on the dreaming branch)
     - Stream: 1
     - Requirements: [2.1](requirements.md#2.1), [3.1](requirements.md#3.1), [3.2](requirements.md#3.2), [3.3](requirements.md#3.3), [3.4](requirements.md#3.4), [3.5](requirements.md#3.5)
-  - [ ] 5.2. Implement src/dreaming/sessions.py apsis client <!-- id:w1na5de -->
+  - [x] 5.2. Implement src/dreaming/sessions.py apsis client <!-- id:w1na5de -->
     - Subprocess wrapper for `apsis --all-projects --list -f shared-json` and `apsis <id> -s <source> -f shared-json`; typed listing rows and session documents; no source parsing in this repository
     - Blocked-by: w1na5dd (Write contract tests against recorded apsis shared-json fixtures)
     - Stream: 1

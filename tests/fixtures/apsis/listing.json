@@ -1,0 +1,99 @@
+{
+  "schema_version": 1,
+  "kind": "listing",
+  "scope": {
+    "all_projects": true
+  },
+  "sessions": [
+    {
+      "source": "copilot",
+      "id": "0199dddd-0000-7000-8000-000000000004",
+      "created_at": "2026-01-17T12:12:21.932Z",
+      "project": "/work/example-repo",
+      "size_bytes": 2069
+    },
+    {
+      "source": "codex",
+      "id": "0199cccc-0000-7000-8000-000000000003",
+      "created_at": "2026-03-05T14:00:00Z",
+      "project": "/work/example-repo",
+      "model": "example-model-a",
+      "provider": "lmstudio",
+      "origin": "codex_cli_rs",
+      "size_bytes": 1605
+    },
+    {
+      "source": "lmstudio",
+      "id": "lmstudio-thread-130d11ea3c18a18b3e2af1056ebe36cdab4e4715e0db09df",
+      "thread_id": "0199cccc-0000-7000-8000-000000000003",
+      "created_at": "2026-03-05T14:00:00Z",
+      "time_zone": "UTC",
+      "model": "example-model-a",
+      "provider": "lmstudio",
+      "request_count": 4
+    },
+    {
+      "source": "lmstudio",
+      "id": "lmstudio-req-p-MjAyNi0wMy8yMDI2LTAzLTA1LjEubG9n-44",
+      "created_at": "2026-03-05T14:00:02Z",
+      "time_zone": "UTC",
+      "model": "example-model-a",
+      "provider": "lmstudio",
+      "request_count": 1
+    },
+    {
+      "source": "lmstudio",
+      "id": "lmstudio-thread-c4d74fced7dd3178b9afd42995f7afb864d0987474d9ad26",
+      "thread_id": "thread-beta",
+      "created_at": "2026-03-05T14:00:08Z",
+      "time_zone": "UTC",
+      "model": "example-model-a",
+      "provider": "lmstudio",
+      "request_count": 1
+    },
+    {
+      "source": "lmstudio",
+      "id": "lmstudio-req-p-MjAyNi0wMy8yMDI2LTAzLTA1LjEubG9n-139",
+      "created_at": "2026-03-05T14:00:09Z",
+      "time_zone": "UTC",
+      "model": "example-model-a",
+      "provider": "lmstudio",
+      "request_count": 1
+    },
+    {
+      "source": "lmstudio",
+      "id": "lmstudio-req-p-MjAyNi0wMy8yMDI2LTAzLTA1LjEubG9n-146",
+      "created_at": "2026-03-05T14:00:10Z",
+      "time_zone": "UTC",
+      "model": "example-model-a",
+      "provider": "lmstudio",
+      "request_count": 1
+    },
+    {
+      "source": "codex",
+      "id": "0199aaaa-0000-7000-8000-000000000001",
+      "created_at": "2026-10-01T09:00:00Z",
+      "project": "/work/example-repo",
+      "model": "example-model-a",
+      "provider": "openai",
+      "origin": "codex_exec",
+      "size_bytes": 1601
+    },
+    {
+      "source": "claude",
+      "id": "0199bbbb-0000-7000-8000-000000000002",
+      "created_at": "2026-10-02T10:00:00Z",
+      "project": "/work/example-repo",
+      "origin": "cli",
+      "size_bytes": 1318
+    },
+    {
+      "source": "codex-exec",
+      "id": "0199aaaa-0000-7000-8000-000000000002-4ffe22242a47931a87dcd3872035ad0295ea8ae4df312c7469991ee74886d4e8",
+      "thread_id": "0199aaaa-0000-7000-8000-000000000002",
+      "size_bytes": 1436,
+      "file_modified_at": "2026-11-14T11:04:09.714758709Z"
+    }
+  ],
+  "warnings": []
+}

@@ -1,3 +1,9 @@
 specs/**/.orbit
 .worktrees/**
 specs/**/comparison-report
+.venv/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+.hypothesis/
+dist/

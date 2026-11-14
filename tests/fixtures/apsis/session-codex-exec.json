@@ -1,0 +1,95 @@
+{
+  "schema_version": 1,
+  "kind": "session",
+  "session": {
+    "source": "codex-exec",
+    "id": "0199aaaa-0000-7000-8000-000000000002-4ffe22242a47931a87dcd3872035ad0295ea8ae4df312c7469991ee74886d4e8",
+    "thread_id": "0199aaaa-0000-7000-8000-000000000002"
+  },
+  "entries": [
+    {
+      "role": "assistant",
+      "turn": 1,
+      "content": [
+        {
+          "type": "tool_use",
+          "item_id": "item_0",
+          "id": "t1:item_0",
+          "name": "command_execution",
+          "input": {
+            "command": "go test ./..."
+          }
+        },
+        {
+          "type": "tool_result",
+          "item_id": "item_0",
+          "status": "completed",
+          "tool_use_id": "t1:item_0",
+          "content": "PASS\n",
+          "is_error": false,
+          "exit_code": 0
+        },
+        {
+          "type": "tool_use",
+          "item_id": "item_1",
+          "id": "t1:item_1",
+          "name": "command_execution",
+          "input": {
+            "command": "go vet ./..."
+          }
+        },
+        {
+          "type": "tool_result",
+          "item_id": "item_1",
+          "status": "completed",
+          "tool_use_id": "t1:item_1",
+          "content": "",
+          "is_error": false,
+          "exit_code": 0
+        },
+        {
+          "type": "text",
+          "item_id": "item_2",
+          "text": "First turn done."
+        },
+        {
+          "type": "usage",
+          "basis": "thread_total_at_turn_completion",
+          "counters": {
+            "input_tokens": 100,
+            "cached_input_tokens": 0,
+            "cache_write_input_tokens": 0,
+            "output_tokens": 10,
+            "reasoning_output_tokens": 0
+          }
+        }
+      ]
+    },
+    {
+      "role": "assistant",
+      "turn": 2,
+      "content": [
+        {
+          "type": "tool_use",
+          "item_id": "item_0",
+          "incomplete": true,
+          "id": "t2:item_0",
+          "name": "command_execution",
+          "input": {
+            "command": "make build"
+          }
+        },
+        {
+          "type": "tool_result",
+          "item_id": "item_0",
+          "status": "in_progress",
+          "incomplete": true,
+          "tool_use_id": "t2:item_0",
+          "content": "compiling\n",
+          "is_error": false
+        }
+      ]
+    }
+  ],
+  "warnings": []
+}

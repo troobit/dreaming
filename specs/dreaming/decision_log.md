@@ -79,6 +79,11 @@
 | Q74 | 2026-11-14 | Currency-review changes stay on the dream branch and are never auto-applied | promoted to Decision 14 |
 | Q75 | 2026-11-14 | A forgotten session is excluded and its data kept; a purge operation is a non-goal | User choice; reversibility over erasure (Decision 13) |
 | Q76 | 2026-11-14 | The report ships in the MVP before adoption, effect measurement and inventory: task 29 depends only on the run engine and the reviewer, and tasks 24, 27 and 28 add their own report sections | A knowledge-only dream needs its report (10.1) with no repository to adopt into; 10.2 and 10.4 are met in full only when those tasks land |
+| Q77 | 2026-11-14 | The `dream` CLI uses argparse and the package has no runtime dependencies | Keeps the wheel portable (14.4) and each versioned install (Decision 11) small; screw's typer adds nothing the commands need |
+| Q78 | 2026-11-14 | `adoption.auto_apply` defaults to false in the program; the user's configuration turns it on, as `instructions/config.example.toml` does (9.7) | A missing or partial config never merges or deploys |
+| Q79 | 2026-11-14 | A Codex rollout's correlation identifier (2.4) is its session id: apsis records no `thread_id` on Codex rollouts, and Codex sends its session id as LM Studio's client thread id | Contract fixtures recorded from apsis 4bf9776 (task 5); LM Studio and Codex exec documents do carry `thread_id` |
+| Q80 | 2026-11-14 | Claude sessions read through apsis 4bf9776 record their model as unknown (2.2) | apsis populates entry models for Codex, Copilot, Kiro and LM Studio but not Claude |
+| Q81 | 2026-11-14 | Codex backends stay skipped for roles needing isolation while the probe finds bundled skills in their prompt (5.5) | Probe of codex-cli 0.169.0: `-c skills.include_instructions=false`, an empty `CODEX_HOME` and every other flag tried leave "Available skills" listed; `--disable apps` removes the codex_apps MCP namespace; claude 2.1.311 with `--safe-mode` passes every check |
 
 ---
 

@@ -1,0 +1,92 @@
+#!/usr/bin/env python3
+"""Fake `codex` for tests. Behaviour comes from the JSON file in FAKE_SCENARIO.
+
+Scenario keys (all optional):
+  version             text printed for --version
+  leak_with_user_home the prompt view shows AGENTS.md, MCP namespaces and skills
+                      unless CODEX_HOME is set
+  leak_instructions   the prompt view includes the canary from AGENTS.md files
+  skills_always       the prompt view always lists skills
+  agent_tool          spawn_agent is listed and reported
+  structured          false: the final message is not JSON
+  exec_fail           `exec` prints a turn.failed event and exits 1
+  fail_with_codex_home  `exec` fails as logged out when CODEX_HOME is set
+  replace_auth_link   `exec` replaces $CODEX_HOME/auth.json with a regular file
+Every invocation is appended to FAKE_LOG as JSON (argv, cwd and CODEX_HOME).
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import sys
+from pathlib import Path
+
+
+def canary() -> str:
+    for directory in [Path.cwd(), *Path.cwd().parents]:
+        path = directory / "AGENTS.md"
+        if path.exists():
+            return path.read_text().split("DREAMING-CANARY:")[1].strip()
+    return ""
+
+
+def prompt_view(scenario: dict) -> list:
+    texts = ["You are Codex. Any skills will be listed in the \"## Skills\" section."]
+    user_home = "CODEX_HOME" not in os.environ
+    if scenario.get("leak_with_user_home") and user_home:
+        texts.append("# AGENTS.md instructions\n\n<INSTRUCTIONS>user rules</INSTRUCTIONS>")
+        texts.append("<tools>\nDeferred tool namespaces:\n- mcp__azure: Azure\n</tools>")
+    if scenario.get("leak_instructions"):
+        texts.append(f"# AGENTS.md instructions\n\nDREAMING-CANARY: {canary()}")
+    if scenario.get("skills_always") or (scenario.get("leak_with_user_home") and user_home):
+        texts.append("## Skills\n### Available skills\n- imagegen: makes images")
+    if scenario.get("agent_tool"):
+        texts.append("<multi_agent_role>You can use `spawn_agent` to create agents.")
+    return [
+        {"type": "message", "role": "developer", "content": [{"type": "input_text", "text": t}]}
+        for t in texts
+    ]
+
+
+def main() -> int:
+    scenario = json.loads(Path(os.environ["FAKE_SCENARIO"]).read_text())
+    args = sys.argv[1:]
+    with open(os.environ["FAKE_LOG"], "a") as log:
+        entry = {"tool": "codex", "argv": args, "cwd": os.getcwd(), "codex_home": os.environ.get("CODEX_HOME")}
+        log.write(json.dumps(entry) + "\n")
+
+    if args == ["--version"]:
+        print(scenario.get("version", "codex-cli 0.169.0"))
+        return 0
+    if args[:2] == ["debug", "prompt-input"]:
+        print(json.dumps(prompt_view(scenario)))
+        return 0
+    if args[:1] != ["exec"]:
+        print(f"unexpected arguments {args}", file=sys.stderr)
+        return 2
+
+    if scenario.get("replace_auth_link") and "CODEX_HOME" in os.environ:
+        auth = Path(os.environ["CODEX_HOME"]) / "auth.json"
+        auth.unlink(missing_ok=True)
+        auth.write_text("{\"refreshed\": true}")
+    thread_id = "0199aaaa-0000-7000-8000-00000000c0de"
+    print(json.dumps({"type": "thread.started", "thread_id": thread_id}))
+    print(json.dumps({"type": "turn.started"}))
+    if scenario.get("exec_fail") or (scenario.get("fail_with_codex_home") and "CODEX_HOME" in os.environ):
+        print(json.dumps({"type": "turn.failed", "error": {"message": "not logged in"}}))
+        return 1
+    tools = ["shell", "apply_patch"]
+    if scenario.get("agent_tool"):
+        tools.append("spawn_agent")
+    answer = {"canary": canary() if scenario.get("leak_instructions") else "", "tools": tools}
+    text = json.dumps(answer) if scenario.get("structured", True) else "canary: none"
+    item = {"id": "item_0", "type": "agent_message", "text": text}
+    print(json.dumps({"type": "item.completed", "item": item}))
+    usage = {"input_tokens": 200, "cached_input_tokens": 50, "output_tokens": 40}
+    print(json.dumps({"type": "turn.completed", "usage": usage}))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

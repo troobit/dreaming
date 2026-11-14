@@ -1,0 +1,84 @@
+#!/usr/bin/env python3
+"""Fake `claude` for tests. Behaviour comes from the JSON file in FAKE_SCENARIO.
+
+Scenario keys (all optional):
+  version            text printed for --version
+  unknown_flags      flags that make it exit 2 as an unknown option
+  leak_instructions  echo the canary from CLAUDE.md files at or above the cwd
+  extra_tools        tools listed beyond those named by --tools
+  skills, mcp_servers  lists reported in the init event
+  structured         false: omit structured_output and print JSON as text
+  fail               exit 1 with this message on stderr
+Every invocation is appended to FAKE_LOG as JSON (argv, cwd and selected env).
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import sys
+from pathlib import Path
+
+
+def main() -> int:
+    scenario = json.loads(Path(os.environ["FAKE_SCENARIO"]).read_text())
+    args = sys.argv[1:]
+    with open(os.environ["FAKE_LOG"], "a") as log:
+        env = {k: v for k, v in os.environ.items() if k.startswith(("CLAUDE_", "ANTHROPIC_"))}
+        log.write(json.dumps({"tool": "claude", "argv": args, "cwd": os.getcwd(), "env": env}) + "\n")
+
+    if args == ["--version"]:
+        print(scenario.get("version", "2.1.311 (Claude Code)"))
+        return 0
+    for flag in scenario.get("unknown_flags", []):
+        if flag in args:
+            print(f"error: unknown option '{flag}'", file=sys.stderr)
+            return 2
+    if scenario.get("fail"):
+        print(scenario["fail"], file=sys.stderr)
+        return 1
+
+    tools = []
+    if "--tools" in args:
+        named = args[args.index("--tools") + 1]
+        tools = [t for t in named.split(",") if t]
+    tools += scenario.get("extra_tools", [])
+    session_id = args[args.index("--session-id") + 1]
+
+    canary = ""
+    if scenario.get("leak_instructions"):
+        for directory in [Path.cwd(), *Path.cwd().parents]:
+            path = directory / "CLAUDE.md"
+            if path.exists():
+                canary = path.read_text().split("DREAMING-CANARY:")[1].strip()
+                break
+
+    init = {
+        "type": "system",
+        "subtype": "init",
+        "session_id": session_id,
+        "cwd": os.getcwd(),
+        "tools": tools,
+        "mcp_servers": [{"name": n, "status": "connected"} for n in scenario.get("mcp_servers", [])],
+        "skills": scenario.get("skills", []),
+        "model": "claude-test",
+    }
+    answer = {"canary": canary, "tools": tools}
+    result = {
+        "type": "result",
+        "subtype": "success",
+        "session_id": session_id,
+        "result": json.dumps(answer),
+        "usage": {"input_tokens": 120, "output_tokens": 30, "cache_read_input_tokens": 5},
+    }
+    if scenario.get("structured", True):
+        result["structured_output"] = answer
+        result["result"] = ""
+    print(json.dumps(init))
+    print(json.dumps({"type": "assistant", "session_id": session_id}))
+    print(json.dumps(result))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
