@@ -8,6 +8,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- Recorded backend dispatch with bounded retries, fallback, schema validation, circuit breaking, resumable provider-limit waits, and shared engine budget accounting.
+- Isolated Claude Code and Codex adapters with role-scoped MCP filtering, stdin prompts, session/model attribution, retained exec streams, and agent-launch termination.
+- Direct tool-free LM Studio calls with loaded-instance context checks, early thread metadata, optional authentication, and structured-output fallback.
+- Five snapshot-based role prompts and output schemas, eleven versioned initial lenses, and bounded reviewer summaries with explicit omission counts.
 - Resumable run engine with stable step dependencies, atomic result/follow-up commits, saved call responses, input lineage, token and active-time accounting, reader reserves, detached lock handoff, and interruption recovery.
 - Read-only `dream run --dry-run` selection and backend planning, `dream status --plan` rendering verified with rune, and database inspection that leaves live SQLite files unchanged.
 - Immutable revision installs through `make install`, a launcher that pins unfinished runs to their original version, foreign-command protection, and explicit pruning that retains versions needed by unfinished runs.

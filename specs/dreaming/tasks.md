@@ -167,61 +167,61 @@ references:
 
 ## Backends and roles
 
-- [ ] 11. Backend dispatcher: retry, fallback and circuit breaker <!-- id:w1na5du -->
+- [x] 11. Backend dispatcher: retry, fallback and circuit breaker <!-- id:w1na5du -->
   - Blocked-by: w1na5d8 (Probe set for harness isolation and structured output), w1na5dl (Steps, calls, budget, lock and resume)
   - Stream: 1
   - Requirements: [1.2](requirements.md#1.2), [4.7](requirements.md#4.7), [4.8](requirements.md#4.8), [5.2](requirements.md#5.2), [5.3](requirements.md#5.3), [5.4](requirements.md#5.4), [5.6](requirements.md#5.6)
-  - [ ] 11.1. Write tests for retry, fallback and accounting with a scripted fake backend <!-- id:w1na5dv -->
+  - [x] 11.1. Write tests for retry, fallback and accounting with a scripted fake backend <!-- id:w1na5dv -->
     - One retry per backend; two transport failures mark the backend unavailable for the run and move to the next (its own single retry); two schema failures mark the input failed and not retried by later dreams unless reselected; breaker_k consecutive schema failures disable the backend; usage-limit errors with a reset time within `max_usage_wait` (fake clock) set the run `waiting` with the wait-until time, sleep, repeat the call and count neither as a retry or failure nor as wall-clock; the waiting notice (backend, reset time, the `fallback_on_usage_limit` option, and the context size and, where reported, release date of the current and next backend) is stored on the run row; with the option on, a usage limit moves to the next backend at once; a reset beyond the cap, no parsable reset time or an unrecognised message is a transport failure; one fixture per known Claude and Codex message form (clock-only and dated); missing usage estimated as ceil(bytes/4) and flagged; inputs resized for the smallest context in the fallback list; no backend left saves progress and ends `partial` with exit 5
     - Blocked-by: w1na5d8 (Probe set for harness isolation and structured output), w1na5dl (Steps, calls, budget, lock and resume)
     - Stream: 1
     - Requirements: [4.7](requirements.md#4.7), [5.2](requirements.md#5.2), [5.3](requirements.md#5.3), [5.4](requirements.md#5.4), [5.6](requirements.md#5.6)
-  - [ ] 11.2. Implement src/dreaming/backends/__init__.py dispatcher <!-- id:w1na5dw -->
+  - [x] 11.2. Implement src/dreaming/backends/__init__.py dispatcher <!-- id:w1na5dw -->
     - Backend protocol (probe, call), per-call timeout with process-group kill, structured-output validation against the role schema independent of the backend option; usage-limit classifier (pure function of the error text) and wait loop that checks for interrupts while sleeping
     - Blocked-by: w1na5dv (Write tests for retry, fallback and accounting with a scripted fake backend)
     - Stream: 1
     - Requirements: [1.2](requirements.md#1.2), [4.8](requirements.md#4.8), [5.3](requirements.md#5.3), [5.6](requirements.md#5.6)
 
-- [ ] 12. Claude Code and Codex harness adapters <!-- id:w1na5dx -->
+- [x] 12. Claude Code and Codex harness adapters <!-- id:w1na5dx -->
   - Blocked-by: w1na5du (Backend dispatcher: retry, fallback and circuit breaker)
   - Stream: 1
   - Requirements: [4.4](requirements.md#4.4), [4.6](requirements.md#4.6), [5.1](requirements.md#5.1), [5.7](requirements.md#5.7), [5.8](requirements.md#5.8)
-  - [ ] 12.1. Write tests for the harness adapters with fake executables <!-- id:w1na5dy -->
+  - [x] 12.1. Write tests for the harness adapters with fake executables <!-- id:w1na5dy -->
     - Per-call MCP config filtered through the role allowlist; devtools started with ENABLE_ADDITIONAL_TOOLS omitting codex-agent and gemini-agent; Claude isolation flags and env vars; Codex events saved under runs/<id>/codex/ and the call killed on an agent-launch event; explicit tools list without Agent; no permission prompt can block; calls row has the harness session id
     - Blocked-by: w1na5du (Backend dispatcher: retry, fallback and circuit breaker)
     - Stream: 1
     - Requirements: [4.4](requirements.md#4.4), [5.7](requirements.md#5.7), [5.8](requirements.md#5.8)
-  - [ ] 12.2. Implement backends/claude.py and backends/codex.py <!-- id:w1na5dz -->
+  - [x] 12.2. Implement backends/claude.py and backends/codex.py <!-- id:w1na5dz -->
     - Use the flag set the probe confirmed; a harness using LM Studio receives its role tools from the same filtered definitions; researchers can read repositories, PR threads and search and fetch the web
     - Blocked-by: w1na5dy (Write tests for the harness adapters with fake executables)
     - Stream: 1
     - Requirements: [4.4](requirements.md#4.4), [4.6](requirements.md#4.6), [5.1](requirements.md#5.1), [5.7](requirements.md#5.7), [5.8](requirements.md#5.8)
 
-- [ ] 13. LM Studio direct adapter for tool-free roles <!-- id:w1na5e0 -->
+- [x] 13. LM Studio direct adapter for tool-free roles <!-- id:w1na5e0 -->
   - Blocked-by: w1na5du (Backend dispatcher: retry, fallback and circuit breaker)
   - Stream: 1
   - Requirements: [4.4](requirements.md#4.4), [5.1](requirements.md#5.1), [5.8](requirements.md#5.8)
-  - [ ] 13.1. Write tests for the LM Studio adapter against a local fake HTTP server <!-- id:w1na5e1 -->
+  - [x] 13.1. Write tests for the LM Studio adapter against a local fake HTTP server <!-- id:w1na5e1 -->
     - client_metadata.thread_id (the run id) is the first key of the request body; context read per call from the loaded model; tool-using roles are refused; truncation-safe record of the call
     - Blocked-by: w1na5du (Backend dispatcher: retry, fallback and circuit breaker)
     - Stream: 1
     - Requirements: [5.1](requirements.md#5.1), [5.8](requirements.md#5.8)
-  - [ ] 13.2. Implement backends/lmstudio.py <!-- id:w1na5e2 -->
+  - [x] 13.2. Implement backends/lmstudio.py <!-- id:w1na5e2 -->
     - OpenAI-compatible chat completion with JSON-schema response format where supported; server-log entry suffices as the dream-call record
     - Blocked-by: w1na5e1 (Write tests for the LM Studio adapter against a local fake HTTP server)
     - Stream: 1
     - Requirements: [5.1](requirements.md#5.1), [5.8](requirements.md#5.8)
 
-- [ ] 14. Roles, schemas and the instruction set <!-- id:w1na5e3 -->
+- [x] 14. Roles, schemas and the instruction set <!-- id:w1na5e3 -->
   - Blocked-by: w1na5d5 (Configuration, lens loading and run snapshot), w1na5du (Backend dispatcher: retry, fallback and circuit breaker)
   - Stream: 1
   - Requirements: [4.2](requirements.md#4.2), [4.3](requirements.md#4.3), [4.4](requirements.md#4.4), [5.2](requirements.md#5.2), [7.1](requirements.md#7.1), [7.2](requirements.md#7.2)
-  - [ ] 14.1. Write tests for role inputs, schemas and lens loading <!-- id:w1na5e4 -->
+  - [x] 14.1. Write tests for role inputs, schemas and lens loading <!-- id:w1na5e4 -->
     - Reader, reviewer, researcher, author and replayer schemas validate good and bad outputs; reviewer input holds summaries and evidence ids and never transcripts; inputs fit the smallest context in the fallback list; no role tool list contains an agent-launching tool; initial lenses cover every item in 7.2
     - Blocked-by: w1na5d5 (Configuration, lens loading and run snapshot), w1na5du (Backend dispatcher: retry, fallback and circuit breaker)
     - Stream: 1
     - Requirements: [4.2](requirements.md#4.2), [4.3](requirements.md#4.3), [4.4](requirements.md#4.4), [7.2](requirements.md#7.2)
-  - [ ] 14.2. Implement roles.py and author instructions/ <!-- id:w1na5e5 -->
+  - [x] 14.2. Implement roles.py and author instructions/ <!-- id:w1na5e5 -->
     - instructions/lenses.toml with the 7.2 initial lenses and versions, roles/{reader,reviewer,researcher,author,replayer}.md, schemas/*.json, config.example.toml; replayer is tool-free and sees only the instruction under replay
     - Blocked-by: w1na5e4 (Write tests for role inputs, schemas and lens loading)
     - Stream: 1

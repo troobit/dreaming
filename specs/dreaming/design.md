@@ -292,6 +292,20 @@ Exit codes follow screw except for budget exhaustion: 0 success (including `budg
 
 ## Risks and Assumptions
 
+- Backend portability (2026-11-15): adapters require a successful capability probe
+  for their installed harness version and use its confirmed flags; an incompatible
+  backend remains unavailable. Shared MCP definitions are passed explicitly to
+  adapters, so no agentic-coding checkout is required. Devtools uses a per-call
+  filtered server definition and explicit enabled-tool names. LM Studio model
+  discovery uses `/api/v1/models` loaded instances, with the older `/api/v0/models`
+  format accepted only when that endpoint is unavailable; no model is loaded by
+  dreaming. Requests use `/v1/chat/completions` with thread metadata first.
+  Role sizing includes serialized schema/tool overhead and reserves output space;
+  oversized indivisible inputs must be split by their phase handler rather than
+  silently cutting evidence. Replayer calls require an isolated copy and a
+  tool-free backend with enforced network isolation; unsupported harnesses refuse
+  that role. Normal checks use fake executables and a local HTTP server, not
+  authenticated live model calls.
 - Run-engine portability (2026-11-15): the detached worker uses POSIX sessions,
   `flock` and inherited file descriptors; other subprocesses close descriptors.
   Steps and their application callbacks are sequential. Call responses are

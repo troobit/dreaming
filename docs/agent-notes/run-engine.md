@@ -15,8 +15,11 @@
   `call` returns `CallResult`; `apply` receives the durable redacted raw response.
 - Resume applies saved successful responses without a model call, even after
   budget exhaustion. A call dispatched without a saved response is indeterminate
-  and stops as partial instead of generating a second answer. Backend recovery,
-  retries/fallbacks, pending-input resizing and the full pipeline are later tasks.
+  and stops as partial instead of generating a second answer. An optional
+  `Dispatcher` owns each attempt's call rows and shares the engine's budget and
+  interrupt flag. Its handler `prepare` returns role, prompt, schema, tools and
+  optional lineage; a handler with `apply` only remains model-free. The complete
+  observation/knowledge pipeline is added by later tasks.
 - Budgets sum every recorded attempt. Active seconds checkpoint at step/call/wait
   boundaries; waits and downtime do not count. A hard kill loses time since the
   last checkpoint. Readers preserve reserved tokens and a distinct-session cap;

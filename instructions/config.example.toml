@@ -15,6 +15,7 @@ reserve_share = 0.25
 min_sessions = 3
 max_usage_wait = 43200
 fallback_on_usage_limit = false
+breaker_k = 3
 
 [backends.claude]
 harness = "claude"
@@ -26,12 +27,28 @@ harness = "codex"
 command = "codex"
 context_tokens = 262144
 
+# Optional direct backend for reader, reviewer and replayer only.
+# A model must already be loaded; context_tokens is an upper bound, checked live.
+# Set LM_API_TOKEN in the environment when the server requires authentication.
+[backends.local]
+harness = "lmstudio"
+base_url = "http://localhost:1234/v1"
+model = "replace-with-loaded-model-key"
+context_tokens = 32768
+
 [roles]
 reader = ["claude", "codex"]
 reviewer = ["claude", "codex"]
 researcher = ["claude", "codex"]
 author = ["claude", "codex"]
 replayer = ["claude", "codex"]
+
+[tools]
+reader = []
+reviewer = []
+replayer = []
+researcher = ["Read", "web_search", "web_fetch", "pr_read"]
+author = ["Read", "Edit", "Write"]
 
 [origins]
 non_interactive_sources = ["codex-exec", "lmstudio"]

@@ -1,0 +1,65 @@
+[[lenses]]
+id = "preferences"
+version = "1"
+look_for = "Explicit user preferences and corrections, preserving their scope and uncertainty."
+changes = ["knowledge", "instructions"]
+
+[[lenses]]
+id = "successful_approaches"
+version = "1"
+look_for = "Approaches associated with user-confirmed or check-confirmed successful outcomes."
+changes = ["knowledge", "workflow"]
+
+[[lenses]]
+id = "explanations"
+version = "1"
+look_for = "Repeated explicit requests for explanation or help and user-stated learning goals."
+changes = ["knowledge", "learning"]
+
+[[lenses]]
+id = "mcp_tools"
+version = "1"
+look_for = "MCP server and tool use, unavailable capabilities and observed opportunities."
+changes = ["configuration", "workflow"]
+
+[[lenses]]
+id = "skills"
+version = "1"
+look_for = "Skills invoked then abandoned, misfiring or missing, and successful skill use."
+changes = ["skills", "knowledge"]
+
+[[lenses]]
+id = "xcode"
+version = "1"
+look_for = "Xcode build, run and preview workflows and repeated friction or confirmed successes."
+changes = ["workflow", "scripts"]
+
+[[lenses]]
+id = "learning_stalls"
+version = "1"
+look_for = "User requests showing a concept, tool error or build step stalled learning; tool failures alone are insufficient."
+changes = ["learning", "knowledge"]
+
+[[lenses]]
+id = "repeated_steps"
+version = "1"
+look_for = "Manual steps repeated across sessions that a Make target, script or skill could perform."
+changes = ["scripts", "skills", "workflow"]
+
+[[lenses]]
+id = "deliverables"
+version = "1"
+look_for = "Repeated hand corrections to reports, agreements, reviews, runbooks or other deliverables of one kind."
+changes = ["templates", "skills", "knowledge"]
+
+[[lenses]]
+id = "context_weight"
+version = "1"
+look_for = "Context spent on instructions and tool schemas, separating measurements from estimates."
+changes = ["configuration", "instructions"]
+
+[[lenses]]
+id = "references"
+version = "1"
+look_for = "Broken or inconsistent references in skills, rules and configuration; cite repository revision, path and location."
+changes = ["references", "configuration"]

@@ -10,6 +10,8 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 
+from dreaming.config import agent_tool
+
 
 @dataclass(frozen=True)
 class ProcessResult:
@@ -22,6 +24,12 @@ class ProcessResult:
 def agent_event(value: object) -> bool:
     if not isinstance(value, dict):
         return False
+    if value.get("type") == "assistant":
+        message = value.get("message", {})
+        blocks = message.get("content", []) if isinstance(message, dict) else []
+        return isinstance(blocks, list) and any(agent_event(block) for block in blocks)
+    if value.get("type") == "content_block_start":
+        return agent_event(value.get("content_block"))
     event_type = value.get("type", "")
     if not isinstance(event_type, str) or not (
         event_type in {"item.started", "item.updated", "item.completed", "tool_use", "tool_call"}
@@ -33,11 +41,7 @@ def agent_event(value: object) -> bool:
         return False
     for key in ("type", "name", "tool", "tool_name"):
         text = item.get(key, "")
-        if isinstance(text, str) and (
-            text in {"spawn_agent", "codex-agent", "gemini-agent", "Agent"}
-            or text.startswith("collab_")
-            or text.endswith(("__spawn_agent", "__codex-agent", "__gemini-agent"))
-        ):
+        if isinstance(text, str) and (agent_tool(text) or text.startswith("collab_")):
             return True
     return False
 
@@ -54,17 +58,25 @@ def _kill_group(process: subprocess.Popen) -> None:
 
 
 def run_process(
-    command: list[str], cwd: Path, env: dict[str, str], timeout: float
+    command: list[str],
+    cwd: Path,
+    env: dict[str, str],
+    timeout: float,
+    *,
+    input_text: str | None = None,
 ) -> ProcessResult:
     output = bytearray()
     pending = bytearray()
     reason = ""
-    with tempfile.TemporaryFile(dir=cwd) as errors:
+    with tempfile.TemporaryFile(dir=cwd) as errors, tempfile.TemporaryFile(dir=cwd) as prompt:
+        if input_text is not None:
+            prompt.write(input_text.encode())
+            prompt.seek(0)
         process = subprocess.Popen(
             command,
             cwd=cwd,
             env=env,
-            stdin=subprocess.DEVNULL,
+            stdin=prompt if input_text is not None else subprocess.DEVNULL,
             stdout=subprocess.PIPE,
             stderr=errors,
             start_new_session=True,

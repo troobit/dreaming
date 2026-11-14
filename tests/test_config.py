@@ -39,6 +39,8 @@ def test_defaults_and_overrides(tmp_path):
         '[roles]\nreader = ["missing"]',
         '[tools]\nreader = ["Read"]',
         '[tools]\nauthor = ["spawn_agent"]',
+        '[tools]\nauthor = ["Task"]',
+        '[tools]\nauthor = ["mcp__devtools__codex_agent"]',
         '[tools]\nauthor = ["mcp__x__codex-agent"]',
         '[backends.local]\nharness = "lmstudio"\n[roles]\nauthor = ["local"]',
         '[thresholds]\nfallback_on_usage_limit = "yes"',

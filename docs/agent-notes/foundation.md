@@ -38,8 +38,9 @@
   suppression flags. Treat this as a failed isolation probe, not proof that a
   flag works. Authenticated model-call probes remain opt-in.
 - Current public CLI commands are `--version`, `probe`, `run --dry-run` and
-  `status [--plan]`. Complete dream execution and direct LM Studio calls have
-  later tasks. Versioned installation and the bootstrap launcher are available.
+  `status [--plan]`. Complete dream execution has later tasks. Backend adapters,
+  direct tool-free LM Studio probing/calls, role definitions, versioned
+  installation and the bootstrap launcher are available as library operations.
 
 Use Makefile targets for checks. `make test` includes isolated wheel installation
 and import of packaged SQL/schema resources. `make test-live` makes real model

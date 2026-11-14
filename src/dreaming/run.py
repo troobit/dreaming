@@ -275,7 +275,16 @@ class RunSession:
 
 
 class Engine:
-    def __init__(self, store: Store, run_id: str, handlers: dict, *, finalize=None, clock=None):
+    def __init__(
+        self,
+        store: Store,
+        run_id: str,
+        handlers: dict,
+        *,
+        finalize=None,
+        clock=None,
+        dispatcher=None,
+    ):
         self.store, self.run_id, self.handlers, self.finalize = store, run_id, handlers, finalize
         self.steps = Steps(store, run_id)
         raw = json.loads(
@@ -284,6 +293,10 @@ class Engine:
         limits = Budget(**{k: v for k, v in raw.items() if k in Budget.__dataclass_fields__})
         self.budget = RunBudget(store, run_id, limits, **({"clock": clock} if clock else {}))
         self.stop_requested = False
+        self.dispatcher = dispatcher
+        if dispatcher is not None:
+            dispatcher.budget = self.budget
+            dispatcher.interrupted = lambda: self.stop_requested
 
     def request_stop(self, *_):
         self.stop_requested = True
@@ -365,7 +378,10 @@ class Engine:
                     (f"No handler for {step.phase}", self.run_id),
                 )
                 return "partial"
-            if raw is None and hasattr(handler, "call"):
+            if raw is None and (
+                hasattr(handler, "call")
+                or (self.dispatcher is not None and hasattr(handler, "prepare"))
+            ):
                 exhausted |= self.budget.exhausted()
                 metadata = handler.prepare(step)
                 sessions = metadata.get("sessions", ())
@@ -376,19 +392,41 @@ class Engine:
                     # Complete a model-free omission so the reviewer can use earlier evidence.
                     self.steps.apply(step.key, '{"omitted":"budget"}', lambda conn, output: None)
                     continue
-                ref = self.steps.begin_call(step.key, **metadata)
-                response: CallResult = handler.call(step)
-                self.steps.record_call(ref, response)
+                if self.dispatcher is not None:
+                    response = self.dispatcher.dispatch(step.key, **metadata)
+                else:
+                    ref = self.steps.begin_call(step.key, **metadata)
+                    response: CallResult = handler.call(step)
+                    self.steps.record_call(ref, response)
                 self.budget.checkpoint()
+                if response.outcome == "budget_exhausted":
+                    exhausted = True
+                    self.steps.apply(step.key, '{"omitted":"budget"}', lambda conn, output: None)
+                    continue
+                if response.outcome == "interrupted":
+                    return "interrupted"
+                if response.outcome == "schema_failure":
+                    self.steps.apply(
+                        step.key, '{"omitted":"schema_failure"}', lambda conn, output: None
+                    )
+                    continue
                 if response.outcome != "success":
-                    return "partial"  # Dispatcher retries/fallbacks belong to task 11.
+                    self.store.connection.execute(
+                        "UPDATE runs SET notice=? WHERE id=?",
+                        (redact(response.error or response.outcome), self.run_id),
+                    )
+                    return "partial"
                 raw = self.steps.saved_output(step.key)
             self.steps.apply(
                 step.key,
                 raw if raw is not None else "null",
                 lambda conn, output, handler=handler, step=step: handler.apply(conn, step, output),
             )
-        incomplete = any(s["state"] in {"pending", "running", "failed"} for s in self.steps.list())
+        incomplete = any(
+            s["state"] in {"pending", "running"}
+            or (s["state"] == "failed" and s["phase"] != "Probe")
+            for s in self.steps.list()
+        )
         if incomplete:
             return "partial"
         if self.stop_requested:

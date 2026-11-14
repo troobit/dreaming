@@ -1,0 +1,336 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Dreaming reviewer output",
+  "type": "object",
+  "properties": {
+    "operations": {
+      "type": "array",
+      "items": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "op": {
+                "const": "assign"
+              },
+              "observation_ids": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "pattern_id": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "required": [
+              "op",
+              "observation_ids",
+              "pattern_id"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "op": {
+                "const": "merge_patterns"
+              },
+              "pattern_ids": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "target_id": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "required": [
+              "op",
+              "pattern_ids",
+              "target_id"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "op": {
+                "const": "create"
+              },
+              "item": {
+                "$ref": "#/$defs/item"
+              }
+            },
+            "required": [
+              "op",
+              "item"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "op": {
+                "const": "revise"
+              },
+              "item_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "base_version": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "item": {
+                "$ref": "#/$defs/item"
+              }
+            },
+            "required": [
+              "op",
+              "item_id",
+              "base_version",
+              "item"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "op": {
+                "enum": [
+                  "supersede",
+                  "contest",
+                  "dismiss",
+                  "revalidate"
+                ]
+              },
+              "item_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "base_version": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "reason": {
+                "type": "string",
+                "minLength": 1
+              },
+              "evidence_ids": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": [
+              "op",
+              "item_id",
+              "base_version",
+              "reason",
+              "evidence_ids"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "op": {
+                "const": "merge_items"
+              },
+              "item_ids": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "target_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "base_version": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "reason": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "required": [
+              "op",
+              "item_ids",
+              "target_id",
+              "base_version",
+              "reason"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "op": {
+                "const": "propose_change"
+              },
+              "pattern_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "evidence_ids": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "summary": {
+                "type": "string",
+                "minLength": 1
+              },
+              "repo": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "op",
+              "pattern_id",
+              "evidence_ids",
+              "summary",
+              "repo"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "op": {
+                "const": "research"
+              },
+              "question": {
+                "type": "string",
+                "minLength": 1
+              },
+              "evidence_ids": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": [
+              "op",
+              "question",
+              "evidence_ids"
+            ],
+            "additionalProperties": false
+          }
+        ]
+      }
+    }
+  },
+  "required": [
+    "operations"
+  ],
+  "additionalProperties": false,
+  "$defs": {
+    "item": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "enum": [
+            "preference",
+            "lesson",
+            "workflow",
+            "learning",
+            "currency"
+          ]
+        },
+        "scope": {
+          "type": "object",
+          "properties": {
+            "domains": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "projects": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "workflows": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "global": {
+              "type": "boolean"
+            },
+            "unresolved": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "domains",
+            "projects",
+            "workflows",
+            "global",
+            "unresolved"
+          ],
+          "additionalProperties": false
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 1
+        },
+        "confidence": {
+          "enum": [
+            "low",
+            "medium",
+            "high"
+          ]
+        },
+        "confidence_basis": {
+          "type": "string",
+          "minLength": 1
+        },
+        "supporting_evidence": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "contradicting_evidence": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "lens_id": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "kind",
+        "scope",
+        "summary",
+        "confidence",
+        "confidence_basis",
+        "supporting_evidence",
+        "contradicting_evidence",
+        "lens_id"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

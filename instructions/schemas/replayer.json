@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Dreaming replayer output",
+  "type": "object",
+  "properties": {
+    "response": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "response"
+  ],
+  "additionalProperties": false
+}

@@ -81,6 +81,12 @@ ROLES = ("reader", "reviewer", "researcher", "author", "replayer")
 TOOL_FREE = {"reader", "reviewer", "replayer"}
 
 
+def agent_tool(name: str) -> bool:
+    return bool(
+        re.search(r"(?:^|__)(?:agent|task|spawn_agent|(?:codex|gemini)[_-]agent)$", name, re.I)
+    )
+
+
 @dataclass(frozen=True)
 class Budget:
     max_sessions: int = 100
@@ -313,10 +319,7 @@ def load_config(path: Path | None = None, *, overrides: dict | None = None) -> C
             raise ConfigError(f"{role} must be tool-free")
         if role not in TOOL_FREE and any(backends[b].harness == "lmstudio" for b in choices):
             raise ConfigError(f"{role} requires a harness for tools")
-        if any(
-            re.search(r"(?:^|__)(?:agent|spawn_agent|codex-agent|gemini-agent)$", tool, re.I)
-            for tool in tools[role]
-        ):
+        if any(agent_tool(tool) for tool in tools[role]):
             raise ConfigError(f"Agent launch tool is not allowed for {role}")
     instructions = _table(raw.get("instructions", {}), "instructions")
     if instructions.keys() - {"repository", "default_branch"}:

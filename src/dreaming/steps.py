@@ -28,6 +28,7 @@ class CallResult:
     session_ref: str | None = None
     outcome: str = "success"
     error: str | None = None
+    model: str | None = None
 
 
 def insert_steps(conn, run_id: str, steps: tuple[Step, ...]) -> None:
@@ -145,7 +146,7 @@ class Steps:
             raise ValueError("Call duration must be finite and nonnegative")
         updated = self.store.connection.execute(
             "UPDATE calls SET raw_output=?,tokens_in=?,tokens_out=?,seconds=?,usage_estimated=?,"
-            "session_ref=COALESCE(?,session_ref),outcome=?,error=? "
+            "session_ref=COALESCE(?,session_ref),outcome=?,error=?,model=COALESCE(?,model) "
             "WHERE id=? AND run_id=? AND outcome IS NULL",
             (
                 redact(result.raw_output),
@@ -156,6 +157,7 @@ class Steps:
                 result.session_ref,
                 result.outcome,
                 redact(result.error) if result.error else None,
+                result.model,
                 call_id,
                 self.run_id,
             ),

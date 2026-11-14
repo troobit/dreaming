@@ -18,6 +18,7 @@ from dreaming.config import (
     BackendConfig,
     Config,
     ConfigError,
+    agent_tool,
     ensure_home,
     home_path,
     require_external,
@@ -106,22 +107,23 @@ def _tools(value: object) -> set[str]:
 
 
 def _agent_tools(tools: set[str]) -> tuple[str, ...]:
-    return tuple(
-        sorted(
-            t
-            for t in tools
-            if t.lower() == "agent"
-            or any(x in t for x in ("spawn_agent", "codex-agent", "gemini-agent"))
-        )
-    )
+    return tuple(sorted(t for t in tools if agent_tool(t)))
 
 
 def _usage(events: list[dict], prompt: str, output: str) -> tuple[int, int, bool]:
     # Claude's result and Codex's turn.completed carry aggregate usage for this call.
     for event in reversed(events):
         usage = event.get("usage")
-        if isinstance(usage, dict) and all(
-            type(usage.get(k)) is int for k in ("input_tokens", "output_tokens")
+        if (
+            isinstance(usage, dict)
+            and all(
+                type(usage.get(k)) is int and usage[k] >= 0
+                for k in ("input_tokens", "output_tokens")
+            )
+            and all(
+                type(usage.get(k, 0)) is int and usage.get(k, 0) >= 0
+                for k in ("cache_creation_input_tokens", "cache_read_input_tokens")
+            )
         ):
             return (
                 usage["input_tokens"]
@@ -172,7 +174,7 @@ def _payload(events: list[dict], final: Path) -> dict:
         if isinstance(event.get("result"), str):
             return json.loads(event["result"])
         item = event.get("item", {})
-        if item.get("type") == "agent_message":
+        if isinstance(item, dict) and item.get("type") == "agent_message":
             return json.loads(item["text"])
     raise ValueError("No structured probe response")
 
@@ -191,9 +193,15 @@ def probe_backend(
     start = time.monotonic()
     result = ProbeResult(name, backend.harness, context_tokens=backend.context_tokens)
     if backend.harness == "lmstudio":
-        return replace(
-            result, reason="LM Studio tool capabilities must be probed through a harness"
-        )
+        if dry_run:
+            return replace(
+                result, reason="Tool-free LM Studio model unprobed; tool roles require a harness"
+            )
+        if max_seconds is not None and max_seconds <= 0:
+            return replace(result, reason="probe wall-clock budget exhausted")
+        from dreaming.backends.lmstudio import LMStudioBackend
+
+        return LMStudioBackend(name, backend, run_id or "probe").probe()
     try:
         version = subprocess.run(
             [backend.command, "--version"],

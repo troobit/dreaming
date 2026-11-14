@@ -1,0 +1,111 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Dreaming reader output",
+  "type": "object",
+  "properties": {
+    "observations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "source": {
+            "type": "string",
+            "minLength": 1
+          },
+          "session_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "entry_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "source_location": {
+            "type": "string",
+            "pattern": "^entry:[0-9]+$"
+          },
+          "representation_version": {
+            "const": 1
+          },
+          "quote": {
+            "type": "string",
+            "minLength": 1
+          },
+          "kind": {
+            "enum": [
+              "preference",
+              "correction",
+              "approach",
+              "learning",
+              "workflow",
+              "tool_use",
+              "skill_use",
+              "reference",
+              "context_weight"
+            ]
+          },
+          "modality": {
+            "enum": [
+              "asserted",
+              "hedged",
+              "tentative"
+            ]
+          },
+          "outcome": {
+            "enum": [
+              "success",
+              "failure",
+              "unknown"
+            ]
+          },
+          "outcome_evidence": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "lens_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "lens_version": {
+            "type": "string",
+            "minLength": 1
+          },
+          "pattern_key": {
+            "type": "string",
+            "minLength": 1
+          },
+          "subject": {
+            "enum": [
+              "user",
+              "tool",
+              "dreaming"
+            ]
+          }
+        },
+        "required": [
+          "source",
+          "session_id",
+          "entry_id",
+          "source_location",
+          "representation_version",
+          "quote",
+          "kind",
+          "modality",
+          "outcome",
+          "outcome_evidence",
+          "lens_id",
+          "lens_version",
+          "pattern_key",
+          "subject"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": [
+    "observations"
+  ],
+  "additionalProperties": false
+}

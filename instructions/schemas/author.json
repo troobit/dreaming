@@ -1,0 +1,149 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Dreaming author output",
+  "type": "object",
+  "properties": {
+    "disposition": {
+      "enum": [
+        "change",
+        "learning",
+        "defer"
+      ]
+    },
+    "reason": {
+      "type": "string",
+      "minLength": 1
+    },
+    "evidence_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "edits": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "path": {
+            "type": "string",
+            "minLength": 1
+          },
+          "before": {
+            "type": "string"
+          },
+          "after": {
+            "type": "string"
+          },
+          "supporting_evidence": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "counter_evidence": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "path",
+          "before",
+          "after",
+          "supporting_evidence",
+          "counter_evidence"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "learning": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "scope": {
+              "type": "object",
+              "properties": {
+                "domains": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "projects": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "workflows": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "global": {
+                  "type": "boolean"
+                },
+                "unresolved": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "domains",
+                "projects",
+                "workflows",
+                "global",
+                "unresolved"
+              ],
+              "additionalProperties": false
+            },
+            "evidence_ids": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "next_step": {
+              "type": "string",
+              "minLength": 1
+            },
+            "outcome": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "scope",
+            "evidence_ids",
+            "next_step",
+            "outcome"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "external_input": {
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "disposition",
+    "reason",
+    "evidence_ids",
+    "edits",
+    "learning",
+    "external_input"
+  ],
+  "additionalProperties": false
+}

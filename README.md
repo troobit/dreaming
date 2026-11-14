@@ -17,6 +17,14 @@ tasks. Preview selection and backend availability with `dream run --dry-run`;
 inspect recorded progress with `dream status` or `dream status --plan`. The plan
 is generated from SQLite for reading with `rune list`.
 
+The Backends and roles library phase adds recorded retries and fallback, schema
+validation, a circuit breaker, and interruptible provider-limit waits that exclude
+sleep from the active-time budget. It provides isolated Claude/Codex adapters,
+a direct tool-free LM Studio adapter, and snapshot-based role prompts, schemas
+and versioned lenses. MCP calls pass through a filter exposing only the role's
+allowlist. Codex roles are refused when their probe cannot establish the required
+tool restrictions. The full reading and knowledge pipeline remains in later phases.
+
 Requires Python 3.12+, uv, and Git on a local POSIX filesystem. Install with
 `make install`, or use `uv run dream` during development.
 
@@ -44,8 +52,11 @@ dream status --plan
 creating the private home or calling models. A real probe calls the selected
 harnesses, records token usage, checks instruction and tool isolation, and
 verifies that apsis can open the resulting session. Results are cached by
-backend version and configuration. LM Studio probes run through a harness;
-configure a Codex backend with `provider = "lmstudio"` and a loaded model.
+backend version and configuration. Tool-using LM Studio calls run through a
+harness; configure a Codex backend with `provider = "lmstudio"` and a loaded
+model. A direct `harness = "lmstudio"` backend serves only tool-free roles and
+probes the already-loaded model without inference. Its dry probe makes no HTTP
+request. `LM_API_TOKEN` supplies authentication when the local server requires it.
 
 Run `make test`, `make lint`, `make format`, and `make build` for development.
 `make test` uses fake harnesses and synthetic upstream contract fixtures. When

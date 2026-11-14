@@ -25,3 +25,7 @@
 - `flock` follows an open-file description shared through `pass_fds`. Closing
   the parent's descriptor preserves the child's lock; `LOCK_UN` would release
   it for both. Mark the inherited descriptor non-inheritable in the worker.
+- `http.client` socket timeouts alone do not bound a response that keeps sending
+  small chunks. Carry one monotonic deadline through discovery and completion,
+  reset the socket timeout to the remaining time at each stage, and use `read1`
+  to regain control between chunks. Bound the accumulated body separately.
