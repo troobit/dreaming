@@ -162,6 +162,18 @@ def stored_output(conn: sqlite3.Connection, run_id: str, key: str) -> dict | Non
     return None if row is None else json.loads(row[0])
 
 
+def answered_by(
+    conn: sqlite3.Connection, run_id: str, key: str
+) -> tuple[str | None, str | None]:
+    """The backend and model whose answer to this call was kept (5.6)."""
+    row = conn.execute(
+        "SELECT backend, model FROM calls WHERE run = ? AND step_key = ?"
+        " AND outcome = 'ok' ORDER BY id DESC LIMIT 1",
+        (run_id, key),
+    ).fetchone()
+    return (None, None) if row is None else (row["backend"], row["model"])
+
+
 def begin_call(
     conn: sqlite3.Connection,
     run_id: str,
@@ -222,4 +234,25 @@ def end_call(
             now,
             call_id,
         ),
+    )
+
+
+# Rejections (6.2, 7.5, 11.6)
+
+
+def record_rejection(
+    conn: sqlite3.Connection,
+    run_id: str,
+    step_key: str,
+    what: str,
+    subject: str | None,
+    reason: str,
+    detail: dict | None = None,
+) -> None:
+    """Record a model's observation or operation the program did not apply, and
+    why, for the report and later dreams' run records."""
+    conn.execute(
+        "INSERT INTO rejections (run, step_key, what, subject, reason, detail,"
+        " created_at) VALUES (?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%S+00:00'))",
+        (run_id, step_key, what, subject, reason, json.dumps(detail or {})),
     )

@@ -713,6 +713,16 @@ def _unchanged(seen: Mapping, row: ListingRow) -> bool:
     )
 
 
+def _input_sessions(input_ref: str | None) -> set[tuple[str, str]]:
+    """The sessions a dream call's input held, from its `input_ref`
+    (`observe.call_input_ref`)."""
+    try:
+        found = json.loads(input_ref or "")["sessions"]
+    except (ValueError, TypeError, KeyError):
+        return set()
+    return {tuple(pair) for pair in found if isinstance(pair, list) and len(pair) == 2}
+
+
 class _Selector:
     def __init__(self, conn, apsis, cfg, request, home, run_id, now) -> None:
         self.apsis = apsis
@@ -735,13 +745,18 @@ class _Selector:
             for row in self.seen.values()
             if row["forgotten"] and row["thread_id"]
         }
+        forgotten = {key for key, row in self.seen.items() if row["forgotten"]}
         self.call_runs: dict[str, str] = {}
+        # Sessions of dream calls whose input held a forgotten session (2.11).
+        self.tainted: set[str] = set()
         for row in conn.execute(
-            "SELECT run, session_ref, harness_session_id FROM calls"
+            "SELECT run, session_ref, harness_session_id, input_ref FROM calls"
         ):
-            for ref in (row["session_ref"], row["harness_session_id"]):
-                if ref:
-                    self.call_runs[ref] = row["run"] or ""
+            refs = [r for r in (row["session_ref"], row["harness_session_id"]) if r]
+            for ref in refs:
+                self.call_runs[ref] = row["run"] or ""
+            if forgotten and _input_sessions(row["input_ref"]) & forgotten:
+                self.tainted.update(refs)
         self.registrations: dict[tuple, Mapping] = {}
         for reg in conn.execute("SELECT * FROM registrations ORDER BY registered_at"):
             self.registrations[(reg["source"], reg["session_id"])] = reg
@@ -871,12 +886,15 @@ class _Selector:
         return self.apsis.session(row.source, row.id)
 
     def _forgotten(self, group: list[ListingRow]) -> bool:
-        """A forgotten session is never selected, through any copy (2.11)."""
+        """A forgotten session is never selected, through any copy, nor is a dream
+        call session whose input held one (2.11)."""
         for row in group:
             seen = self.seen.get((row.source, row.id))
             if seen is not None and seen["forgotten"]:
                 return True
             if row.correlation_id in self.forgotten_threads:
+                return True
+            if {row.id, row.correlation_id} & self.tainted:
                 return True
         return False
 
@@ -1024,15 +1042,17 @@ def record_session(
         _upsert_seen(conn, values)
 
 
-def record_skipped(conn: sqlite3.Connection, run_id: str, skipped: Skipped) -> None:
-    """Record an unparseable session with its reason, keeping what an earlier
-    dream read of it (2.7)."""
+def record_skipped(
+    conn: sqlite3.Connection, run_id: str, skipped: Skipped, *, state: str = "skipped"
+) -> None:
+    """Record an unparseable session (2.7), or one whose reading failed (4.7),
+    with its reason, keeping what an earlier dream read of it."""
     _upsert_seen(
         conn,
         {
             "source": skipped.source,
             "session_id": skipped.id,
-            "state": "skipped",
+            "state": state,
             "reason": skipped.reason,
             "last_run": run_id,
         },

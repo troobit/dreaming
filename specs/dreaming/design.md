@@ -220,7 +220,9 @@ SQLite at `~/.dreaming/dreaming.db`, migrations by integer `user_version`.
 | `observations` | evidence id, session, entry id, source location + representation version, redacted quote, kind, modality, excluded flag, outcome, lens id+version, pattern id, backend/model, subject |
 | `file_findings` | evidence id, repo, revision, path, location, lens, finding |
 | `research_findings` | id, question, finding, sources, backend/model, run; kept apart from observations, never counted as behaviour evidence (13.1, 13.6) |
-| `patterns` | persistent id, key, lens scope, created |
+| `patterns` | persistent id, key, lens scope, created, last reviewed run, merged into |
+| `rejections` | run, step, what (observation or reviewer operation), subject, reason, redacted detail (6.2, 7.5, 11.6) |
+| `candidates`, `questions` | candidate id, pattern, change or learning, repository, evidence ids, rank position and signals, status; research questions by candidate |
 | `knowledge_items`, `knowledge_revisions` | id, version, kind, scope, status, confidence + basis, supporting/contradicting evidence ids, latest support date, lens, model, originating run or feedback, actor (`dream|user|feedback`), base version, pending_reassessment |
 | `feedback` | feedback id, revisions (cited/present_only), run/session ref, outcome, basis |
 | `changes` | pattern or currency finding, repo, branch, commit, external_input flag, applied_at, reverted_at, status (`proposed|applied|waiting|withheld|rejected|failed`), rank signals |

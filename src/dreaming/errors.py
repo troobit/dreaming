@@ -26,6 +26,15 @@ class DreamingError(Exception):
         super().__init__(message)
 
 
+class Rejected(Exception):
+    """A model's observation or operation that fails the program's rules; it is
+    recorded with the reason and not applied (6.2, 19)."""
+
+    def __init__(self, reason: str) -> None:
+        super().__init__(reason)
+        self.reason = reason
+
+
 class Partial(DreamingError):
     """No backend is left for a role: the run saves its progress and ends partial
     (5.3)."""

@@ -5,11 +5,23 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-from datetime import datetime
+from datetime import UTC, datetime
+from pathlib import Path
 
-from dreaming import __version__, budget, config, plan, run, steps, store
+from dreaming import (
+    __version__,
+    budget,
+    config,
+    observe,
+    plan,
+    roles,
+    run,
+    sessions,
+    steps,
+    store,
+)
 from dreaming.backends import probe
-from dreaming.errors import USAGE_ERROR, DreamingError
+from dreaming.errors import FAILURE, USAGE_ERROR, DreamingError
 
 
 def _config(args: argparse.Namespace) -> int:
@@ -200,6 +212,76 @@ def _status(args: argparse.Namespace) -> int:
     return 0
 
 
+def _describe_trial(result: dict) -> str:
+    def share(part: int, whole: int, rate: float | None) -> str:
+        return f"{part} of {whole}" + (f" ({rate:.0%})" if rate is not None else "")
+
+    answered = result["calls"] - result["failed_calls"]
+    estimated = " (estimated)" if result["usage_estimated"] else ""
+    lines = [
+        f"Reader trial on {result['backend']}: {result['sessions']} sessions, "
+        f"{result['calls']} calls, {result['failed_calls']} failed",
+        "  schema-valid outputs: "
+        + share(result["schema_valid"], answered, result["schema_valid_rate"]),
+        "  quotes matching their entry: "
+        + share(
+            result["quote_matches"], result["observations"], result["quote_match_rate"]
+        ),
+        f"  observations passing every check: {result['accepted']}",
+        f"  tokens: {result['tokens_in']} in, {result['tokens_out']} out{estimated}",
+    ]
+    lines += [f"  error: {error}" for error in result["errors"]]
+    return "\n".join(lines)
+
+
+def _trial(args: argparse.Namespace) -> int:
+    """Run the reader on recorded sessions with one backend; nothing is stored
+    (design, Risks and Assumptions)."""
+    cfg = config.load_config()
+    if args.backend not in cfg["backends"]:
+        raise _usage(f"unknown backend {args.backend!r}")
+    if args.sessions < 1:
+        raise _usage("--sessions must be at least 1")
+    cfg = config.apply_overrides(
+        cfg,
+        {"roles": {"reader": [args.backend]}, "budget": {"sessions": args.sessions}},
+    )
+    home = config.ensure_home()
+    trial_id = run.new_run_id(datetime.now(UTC)).replace("dream-", "dream-trial-", 1)
+    if args.instructions:
+        root = Path(args.instructions).expanduser()
+    else:
+        root = config.write_snapshot(home, trial_id, cfg) / "instructions"
+    instructions = roles.load(root, cfg)
+    result = probe.cached_status(home, cfg, args.backend)
+    if not result.usable:
+        result = probe.probe_backend(home, cfg, args.backend)
+    backend = probe.adapter(home, cfg, trial_id, result)
+    if backend is None:
+        reason = result.reason or "; ".join(result.problems())
+        raise DreamingError(
+            f"backend {args.backend} is not usable: {reason}",
+            FAILURE,
+            "backend_unavailable",
+        )
+    selection = _selection(args)
+    selection["reread"] = True
+    conn = store.memory_copy(store.store_path(home))
+    try:
+        chosen = sessions.select_sessions(
+            conn,
+            sessions.Apsis.from_config(cfg, home),
+            cfg,
+            sessions.SelectionRequest.from_dict(selection),
+            home=home,
+        )
+    finally:
+        conn.close()
+    report = observe.trial_reader(chosen.sessions, backend, instructions, cfg)
+    print(json.dumps(report, indent=2) if args.json else _describe_trial(report))
+    return 0
+
+
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="dream",
@@ -276,6 +358,29 @@ def _parser() -> argparse.ArgumentParser:
         help="write the steps as a rune task file and print its path",
     )
     status.set_defaults(handler=_status)
+
+    trial = commands.add_parser(
+        "trial", help="try a role on recorded sessions without storing anything"
+    )
+    trials = trial.add_subparsers(dest="role", metavar="ROLE", required=True)
+    reader = trials.add_parser(
+        "reader",
+        help="measure a backend's schema-valid and quote-match rates as a reader",
+    )
+    reader.add_argument("--backend", required=True, metavar="NAME")
+    reader.add_argument(
+        "--sessions", type=int, default=10, metavar="N", help="default 10"
+    )
+    reader.add_argument("--since", metavar="DATE", help="sessions started at or after")
+    reader.add_argument("--until", metavar="DATE", help="sessions started before")
+    reader.add_argument("--project", metavar="PATH", help="sessions in this project")
+    reader.add_argument(
+        "--instructions",
+        metavar="DIR",
+        help="an instruction set to use instead of the configured default branch",
+    )
+    reader.add_argument("--json", action="store_true", help="print JSON")
+    reader.set_defaults(handler=_trial, reread=False, repo=None, workflow=None)
     return parser
 
 

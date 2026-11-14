@@ -200,7 +200,10 @@ class Phase(Protocol):
         """Gather the step's inputs and make its model calls through `ctx`."""
 
     def apply(self, conn: sqlite3.Connection, step: Step, prepared: Any) -> Outcome:
-        """Write the step's results; runs inside the step's transaction."""
+        """Write the step's results; runs inside the step's transaction.
+
+        A phase may also define `failed(conn, step, reason)`, which runs in the
+        transaction that marks the step failed when its input fails (4.7)."""
 
 
 Planner = Callable[["Context"], Sequence[NewStep]]
@@ -493,6 +496,9 @@ class Runner:
         except InputFailed as failed:
             self.failed_on.setdefault(failed.backend, set()).add(step.key)
             with store.transaction(self.conn):
+                record = getattr(phase, "failed", None)
+                if record is not None:
+                    record(self.conn, step, failed.message)
                 steps.finish(self.conn, self.run_id, step.key, "failed", failed.message)
                 self.save_clock()
             log(f"{step.key} failed: {failed.message}")

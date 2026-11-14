@@ -358,7 +358,52 @@ ALTER TABLE runs ADD COLUMN active_seconds REAL NOT NULL DEFAULT 0;
 ALTER TABLE runs ADD COLUMN error TEXT;
 """
 
-MIGRATIONS: list[str] = [_SCHEMA_V1, _SCHEMA_V2, _SCHEMA_V3]
+# Observations and review: what the program rejected and why (6.2, 7.5, 11.6),
+# the reviewer's candidates with their rank (11.3) and research questions, merged
+# patterns (11.4), and the pattern a learning recommendation rests on (15.3).
+_SCHEMA_V4 = """
+CREATE TABLE rejections (
+    id INTEGER PRIMARY KEY,
+    run TEXT REFERENCES runs (id),
+    step_key TEXT,
+    what TEXT NOT NULL,
+    subject TEXT,
+    reason TEXT NOT NULL,
+    detail TEXT NOT NULL DEFAULT '{}',
+    created_at TEXT NOT NULL
+);
+CREATE INDEX rejections_run ON rejections (run, what);
+
+CREATE TABLE candidates (
+    id TEXT PRIMARY KEY,
+    run TEXT NOT NULL REFERENCES runs (id),
+    pattern_id TEXT REFERENCES patterns (id),
+    proposal TEXT NOT NULL CHECK (proposal IN ('change', 'learning')),
+    repo TEXT,
+    summary TEXT NOT NULL,
+    evidence TEXT NOT NULL DEFAULT '[]',
+    position INTEGER,
+    signals TEXT NOT NULL DEFAULT '{}',
+    status TEXT NOT NULL DEFAULT 'open'
+        CHECK (status IN ('open', 'authored', 'deferred', 'discarded')),
+    reason TEXT,
+    created_at TEXT NOT NULL
+);
+
+CREATE TABLE questions (
+    id TEXT PRIMARY KEY,
+    run TEXT NOT NULL REFERENCES runs (id),
+    candidate_id TEXT REFERENCES candidates (id),
+    question TEXT NOT NULL,
+    reason TEXT,
+    created_at TEXT NOT NULL
+);
+
+ALTER TABLE patterns ADD COLUMN merged_into TEXT;
+ALTER TABLE learning ADD COLUMN pattern_id TEXT;
+"""
+
+MIGRATIONS: list[str] = [_SCHEMA_V1, _SCHEMA_V2, _SCHEMA_V3, _SCHEMA_V4]
 
 
 def statements(script: str) -> list[str]:

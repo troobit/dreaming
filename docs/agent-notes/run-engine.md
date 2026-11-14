@@ -6,8 +6,8 @@ Tasks 8–10 of `specs/dreaming/tasks.md`: `steps.py`, `budget.py`, `run.py`, `p
 
 - `run.start` (the invoking process) takes `~/.dreaming/lock` with a non-blocking `flock`, creates or resumes the run row inside one transaction, spawns `python -I -m dreaming.run <id> --lock-fd N` with `pass_fds` and `start_new_session=True`, records the child's pid as `runs.process_group`, then closes its own descriptor. Tests pass `child=[...]` to swap in fake child programs.
 - The child (`run.child_main`) marks the descriptor non-inheritable, re-locks it (a no-op on the same open file description), builds a `Runner` from the run's snapshot config plus `runs.overrides` (`run.run_config`), and exits with `run.exit_code(status)`. Its stdout and stderr go to `runs/<id>/run.log`.
-- `run.PHASES`, `BACKENDS`, `PLANNER` and `REPORT` are empty module-level registries: until the phase tasks (11 onward) fill them, a real `dream run` plans no steps and ends `complete` at once.
-- A phase is an object with `prepare(ctx, step)` (outside any transaction; makes calls through `ctx.call`) and `apply(conn, step, prepared) -> Outcome` (inside the step's transaction). The runner adds `Outcome.follow_up` and marks the step in that same transaction.
+- `run.PHASES`, `BACKENDS`, `PLANNER` and `REPORT` are empty module-level registries, so a real `dream run` still plans no steps and ends `complete` at once. `observe.ReadPhase` (with its `plan`) and `review.ReviewPhase` exist but need the snapshot's instruction set and an apsis client to construct; installing them belongs to task 22/31 with the backends.
+- A phase is an object with `prepare(ctx, step)` (outside any transaction; makes calls through `ctx.call`) and `apply(conn, step, prepared) -> Outcome` (inside the step's transaction). The runner adds `Outcome.follow_up` and marks the step in that same transaction. An optional `failed(conn, step, reason)` runs in the transaction that marks a step `failed` after `InputFailed`.
 
 ## Exactly-once calls
 

@@ -146,13 +146,16 @@ def add_observation(
     pattern_id=None,
     project=None,
     observed_on="2026-11-01",
+    domain=None,
+    lens="prefs",
+    subject="user",
 ):
     entry_id = entry_id or evidence_id
     db.execute(
         "INSERT INTO observations (evidence_id, source, session_id, entry_id,"
         " location, representation_version, quote, kind, modality, outcome, lens,"
-        " lens_version, pattern_id, project, observed_on)"
-        " VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?, ?, 'prefs', 1, ?, ?, ?)",
+        " lens_version, pattern_id, project, observed_on, domain, subject)"
+        " VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?)",
         (
             evidence_id,
             source,
@@ -163,9 +166,12 @@ def add_observation(
             kind,
             modality,
             outcome,
+            lens,
             pattern_id,
             project,
             observed_on,
+            domain,
+            subject,
         ),
     )
 

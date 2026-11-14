@@ -229,76 +229,76 @@ references:
 
 ## Observations and knowledge
 
-- [ ] 15. Observation verification, redaction and attribution gate <!-- id:w1na5e6 -->
+- [x] 15. Observation verification, redaction and attribution gate <!-- id:w1na5e6 -->
   - Blocked-by: w1na5d2 (SQLite store and migrations), w1na5di (Attribution, registration and forgetting), w1na5e3 (Roles, schemas and the instruction set)
   - Stream: 1
   - Requirements: [2.9](requirements.md#2.9), [6.1](requirements.md#6.1), [6.2](requirements.md#6.2), [6.3](requirements.md#6.3), [12.3](requirements.md#12.3), [13.1](requirements.md#13.1)
-  - [ ] 15.1. Write tests and property tests for verification and redaction <!-- id:w1na5e7 -->
+  - [x] 15.1. Write tests and property tests for verification and redaction <!-- id:w1na5e7 -->
     - Property: for any entry text and quote drawn from it, verify holds before redaction and redaction is idempotent; mismatch at the recorded location is rejected and counted; reprocessing under unchanged lens versions creates no duplicates; `user_statement` rejected on tool-attributed entries; modality and outcome labels stored; assistant claims of success never become confirmed outcomes
     - Blocked-by: w1na5d2 (SQLite store and migrations), w1na5di (Attribution, registration and forgetting), w1na5e3 (Roles, schemas and the instruction set)
     - Stream: 1
     - Requirements: [2.9](requirements.md#2.9), [6.2](requirements.md#6.2), [6.3](requirements.md#6.3), [13.1](requirements.md#13.1)
-  - [ ] 15.2. Implement observe.py and redact.py <!-- id:w1na5e8 -->
+  - [x] 15.2. Implement observe.py and redact.py <!-- id:w1na5e8 -->
     - Credential patterns seeded from agentic-coding scripts/review_html/redact.py with source path, revision and licence recorded in the module header; evidence id, source location (entry id plus representation version), lens id and version, producing backend and model
     - Blocked-by: w1na5e7 (Write tests and property tests for verification and redaction)
     - Stream: 1
     - Requirements: [6.1](requirements.md#6.1), [6.2](requirements.md#6.2), [12.3](requirements.md#12.3)
 
-- [ ] 16. Reader phase and deterministic clustering <!-- id:w1na5e9 -->
+- [x] 16. Reader phase and deterministic clustering <!-- id:w1na5e9 -->
   - Blocked-by: w1na5df (Session selection, dedupe and splitting), w1na5dl (Steps, calls, budget, lock and resume), w1na5e3 (Roles, schemas and the instruction set), w1na5e6 (Observation verification, redaction and attribution gate)
   - Stream: 1
   - Requirements: [4.3](requirements.md#4.3), [6.1](requirements.md#6.1), [6.5](requirements.md#6.5)
-  - [ ] 16.1. Write tests for the reader step and clustering with a fake model <!-- id:w1na5ea -->
+  - [x] 16.1. Write tests for the reader step and clustering with a fake model <!-- id:w1na5ea -->
     - Batch to observations through the dispatcher; deterministic pass normalises pattern_key and clusters by key and lens scope; property: shuffling observations before review yields the same clusters; failed inputs listed and not retried
     - Blocked-by: w1na5df (Session selection, dedupe and splitting), w1na5dl (Steps, calls, budget, lock and resume), w1na5e3 (Roles, schemas and the instruction set), w1na5e6 (Observation verification, redaction and attribution gate)
     - Stream: 1
     - Requirements: [4.3](requirements.md#4.3), [6.1](requirements.md#6.1), [6.5](requirements.md#6.5)
-  - [ ] 16.2. Implement the Read steps and clustering <!-- id:w1na5eb -->
+  - [x] 16.2. Implement the Read steps and clustering <!-- id:w1na5eb -->
     - Read steps created from the selection; observations written in the step's result transaction; per-session pattern counts kept after transcripts are pruned
     - Blocked-by: w1na5ea (Write tests for the reader step and clustering with a fake model)
     - Stream: 1
     - Requirements: [4.3](requirements.md#4.3), [6.5](requirements.md#6.5), [6.6](requirements.md#6.6)
 
-- [ ] 17. Reader trial command for local models <!-- id:w1na5ec -->
+- [x] 17. Reader trial command for local models <!-- id:w1na5ec -->
   - Blocked-by: w1na5e9 (Reader phase and deterministic clustering), w1na5dx (Claude Code and Codex harness adapters), w1na5e0 (LM Studio direct adapter for tool-free roles)
   - Stream: 1
   - Requirements: [5.6](requirements.md#5.6)
-  - [ ] 17.1. Write tests for `dream trial reader` <!-- id:w1na5ed -->
+  - [x] 17.1. Write tests for `dream trial reader` <!-- id:w1na5ed -->
     - Runs the reader on N recorded sessions with a chosen backend and reports schema-valid rate, quote-match rate and tokens; makes no store writes
     - Blocked-by: w1na5e9 (Reader phase and deterministic clustering), w1na5dx (Claude Code and Codex harness adapters), w1na5e0 (LM Studio direct adapter for tool-free roles)
     - Stream: 1
     - Requirements: [5.6](requirements.md#5.6)
-  - [ ] 17.2. Implement `dream trial reader` <!-- id:w1na5ee -->
+  - [x] 17.2. Implement `dream trial reader` <!-- id:w1na5ee -->
     - Used to decide whether a local model may be first in the reader fallback list (design Risks and Assumptions)
     - Blocked-by: w1na5ed (Write tests for `dream trial reader`)
     - Stream: 1
     - Requirements: [5.6](requirements.md#5.6)
 
-- [ ] 18. Knowledge rules: promotion, scope, conflicts and ranking <!-- id:w1na5ef -->
+- [x] 18. Knowledge rules: promotion, scope, conflicts and ranking <!-- id:w1na5ef -->
   - Blocked-by: w1na5d2 (SQLite store and migrations), w1na5e6 (Observation verification, redaction and attribution gate)
   - Stream: 1
   - Requirements: [2.10](requirements.md#2.10), [4.5](requirements.md#4.5), [11.3](requirements.md#11.3), [11.4](requirements.md#11.4), [11.7](requirements.md#11.7), [13.2](requirements.md#13.2), [13.3](requirements.md#13.3), [13.4](requirements.md#13.4), [13.5](requirements.md#13.5), [13.6](requirements.md#13.6), [13.8](requirements.md#13.8), [13.9](requirements.md#13.9), [15.1](requirements.md#15.1), [15.3](requirements.md#15.3)
-  - [ ] 18.1. Write tests and property tests for the knowledge rules <!-- id:w1na5eg -->
+  - [x] 18.1. Write tests and property tests for the knowledge rules <!-- id:w1na5eg -->
     - Promotion at min_sessions distinct sessions, one count per interaction; "approach worked" needs a confirmed success; explicit user statements apply at once within scope; contested and superseded transitions; dismissed items never reactivate under a new identifier; revision cap per scope; item version checks reject stale writes; ranking with half-life decay and id tie-break; property: promotion and retrieval are independent of input order; learning recommendation dispositions
     - Blocked-by: w1na5d2 (SQLite store and migrations), w1na5e6 (Observation verification, redaction and attribution gate)
     - Stream: 1
     - Requirements: [4.5](requirements.md#4.5), [11.3](requirements.md#11.3), [13.2](requirements.md#13.2), [13.3](requirements.md#13.3), [13.4](requirements.md#13.4), [13.5](requirements.md#13.5), [13.9](requirements.md#13.9), [15.3](requirements.md#15.3)
-  - [ ] 18.2. Implement knowledge.py and review.py rules <!-- id:w1na5eh -->
+  - [x] 18.2. Implement knowledge.py and review.py rules <!-- id:w1na5eh -->
     - Concepts adapted from OpenClaw and the Prior Art sources with no copied source (12.2); actor and base version on revisions; pending-reassessment queue and conclusion recording; merge_items and revalidate_after_days
     - Blocked-by: w1na5eg (Write tests and property tests for the knowledge rules)
     - Stream: 1
     - Requirements: [2.10](requirements.md#2.10), [11.4](requirements.md#11.4), [11.7](requirements.md#11.7), [13.6](requirements.md#13.6), [13.8](requirements.md#13.8), [15.1](requirements.md#15.1)
 
-- [ ] 19. Reviewer phase <!-- id:w1na5ei -->
+- [x] 19. Reviewer phase <!-- id:w1na5ei -->
   - Blocked-by: w1na5du (Backend dispatcher: retry, fallback and circuit breaker), w1na5e9 (Reader phase and deterministic clustering), w1na5ef (Knowledge rules: promotion, scope, conflicts and ranking)
   - Stream: 1
   - Requirements: [4.3](requirements.md#4.3), [4.5](requirements.md#4.5), [6.5](requirements.md#6.5), [9.13](requirements.md#9.13), [9.14](requirements.md#9.14), [11.3](requirements.md#11.3), [11.4](requirements.md#11.4), [11.6](requirements.md#11.6), [13.8](requirements.md#13.8)
-  - [ ] 19.1. Write tests for the Review step with a fake reviewer <!-- id:w1na5ej -->
+  - [x] 19.1. Write tests for the Review step with a fake reviewer <!-- id:w1na5ej -->
     - Bounded summaries ordered by rank with new-cluster share reserved and a leftover count; operations validated and applied or recorded rejected with reasons; research and author steps created in the same transaction; no candidate for a pattern with an unmerged branch; a reverted change re-proposed at most once on newer observations
     - Blocked-by: w1na5du (Backend dispatcher: retry, fallback and circuit breaker), w1na5e9 (Reader phase and deterministic clustering), w1na5ef (Knowledge rules: promotion, scope, conflicts and ranking)
     - Stream: 1
     - Requirements: [4.3](requirements.md#4.3), [4.5](requirements.md#4.5), [9.13](requirements.md#9.13), [9.14](requirements.md#9.14), [11.3](requirements.md#11.3), [11.4](requirements.md#11.4)
-  - [ ] 19.2. Implement the Review step <!-- id:w1na5ek -->
+  - [x] 19.2. Implement the Review step <!-- id:w1na5ek -->
     - last_reviewed_run and boost_after_dreams; candidate positions and signals stored for the report; reviewer receives earlier run records as evidence about dreaming
     - Blocked-by: w1na5ej (Write tests for the Review step with a fake reviewer)
     - Stream: 1
