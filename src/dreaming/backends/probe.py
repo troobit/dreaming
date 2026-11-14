@@ -19,7 +19,13 @@ from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 
-from dreaming.backends import claude, codex, lmstudio, run_process
+from dreaming.backends import (
+    claude,
+    codex,
+    estimate_tokens,
+    lmstudio,
+    run_process,
+)
 from dreaming.errors import USAGE_ERROR, DreamingError
 
 PROBE_TIMEOUT_SECONDS = 300
@@ -96,11 +102,6 @@ def _backend(cfg: dict, name: str) -> dict:
     if name not in cfg["backends"]:
         raise DreamingError(f"unknown backend {name!r}", USAGE_ERROR, "invalid_config")
     return cfg["backends"][name]
-
-
-def _estimate(*texts: str) -> int:
-    """`ceil(utf8 bytes / 4)`, the estimate used when a harness omits usage."""
-    return -(-sum(len(text.encode()) for text in texts) // 4)
 
 
 def _json_object(text: str | None) -> dict | None:
@@ -254,8 +255,8 @@ def _probe_claude(
         base.agent_enforcement = "" if agent else "removed"
         base.session_ref = session_id
         base.tokens_in, base.tokens_out = usage or (
-            _estimate(PROBE_PROMPT),
-            _estimate(json.dumps(answer)),
+            estimate_tokens(PROBE_PROMPT),
+            estimate_tokens(json.dumps(answer)),
         )
         base.usage_estimated = usage is None
         base.apsis_finds_session = _apsis_opens(cfg, "claude", session_id, work)
@@ -355,8 +356,8 @@ def _probe_codex(
         result.session_ref = events.thread_id
         usage = codex.usage(events)
         result.tokens_in, result.tokens_out = usage or (
-            _estimate(PROBE_PROMPT),
-            _estimate(events.message),
+            estimate_tokens(PROBE_PROMPT),
+            estimate_tokens(events.message),
         )
         result.usage_estimated = usage is None
         exec_dir = ["--codex-exec-dir", str(streams)]
@@ -411,7 +412,10 @@ def _probe_lmstudio(
         result.tokens_in = int(usage.get("prompt_tokens") or 0)
         result.tokens_out = int(usage.get("completion_tokens") or 0)
     else:
-        result.tokens_in, result.tokens_out = _estimate(prompt), _estimate(content)
+        result.tokens_in, result.tokens_out = (
+            estimate_tokens(prompt),
+            estimate_tokens(content),
+        )
         result.usage_estimated = True
     log_dir = cfg["apsis"]["lmstudio_log_dir"]
     extra = ["--lmstudio-log-dir", log_dir] if log_dir else []

@@ -9,6 +9,12 @@ from dataclasses import dataclass
 from pathlib import Path
 
 
+def estimate_tokens(*texts: str) -> int:
+    """`ceil(utf8 bytes / 4)`, the estimate used when a harness omits usage and
+    for sizing inputs."""
+    return -(-sum(len(text.encode()) for text in texts) // 4)
+
+
 @dataclass
 class ProcessResult:
     returncode: int

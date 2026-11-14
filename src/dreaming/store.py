@@ -342,7 +342,14 @@ CREATE TABLE currency_findings (
 );
 """
 
-MIGRATIONS: list[str] = [_SCHEMA_V1]
+# The listing size at the last read, so selection can pass over an unchanged
+# processed session without opening it (2.5).
+_SCHEMA_V2 = """
+ALTER TABLE sessions_seen ADD COLUMN size_bytes INTEGER;
+ALTER TABLE sessions_seen ADD COLUMN request_count INTEGER;
+"""
+
+MIGRATIONS: list[str] = [_SCHEMA_V1, _SCHEMA_V2]
 
 
 def statements(script: str) -> list[str]:

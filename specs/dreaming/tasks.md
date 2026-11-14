@@ -88,31 +88,31 @@ references:
 
 ## Sessions
 
-- [ ] 6. Session selection, dedupe and splitting <!-- id:w1na5df -->
+- [x] 6. Session selection, dedupe and splitting <!-- id:w1na5df -->
   - Blocked-by: w1na5d2 (SQLite store and migrations), w1na5d5 (Configuration, lens loading and run snapshot), w1na5dc (apsis client and contract checks)
   - Stream: 1
   - Requirements: [1.3](requirements.md#1.3), [1.4](requirements.md#1.4), [1.5](requirements.md#1.5), [2.4](requirements.md#2.4), [2.5](requirements.md#2.5), [2.6](requirements.md#2.6), [2.7](requirements.md#2.7), [2.8](requirements.md#2.8)
-  - [ ] 6.1. Write tests for selection, de-duplication and splitting <!-- id:w1na5dg -->
+  - [x] 6.1. Write tests for selection, de-duplication and splitting <!-- id:w1na5dg -->
     - Newest-first within budget; unread additions only under unchanged lens versions; date, project and reread filters; exclude the running dream (thread_id == run id, calls.session_ref, cwd under DREAMING_HOME) and recent files; earlier dreams tagged subject=dreaming; one interaction per thread_id with harness content plus log metadata; unparseable sessions skipped with reason; scoped dreams; property: every entry lands in exactly one split part, each part fits
     - Blocked-by: w1na5d2 (SQLite store and migrations), w1na5d5 (Configuration, lens loading and run snapshot), w1na5dc (apsis client and contract checks)
     - Stream: 1
     - Requirements: [1.3](requirements.md#1.3), [1.4](requirements.md#1.4), [1.5](requirements.md#1.5), [2.4](requirements.md#2.4), [2.5](requirements.md#2.5), [2.6](requirements.md#2.6), [2.7](requirements.md#2.7), [2.8](requirements.md#2.8)
-  - [ ] 6.2. Implement selection, dedupe and splitting in sessions.py <!-- id:w1na5dh -->
+  - [x] 6.2. Implement selection, dedupe and splitting in sessions.py <!-- id:w1na5dh -->
     - Consecutive entry ranges sized to the reader context after the prompt; an oversized entry is cut with a truncation marker; unattributed server warnings go to the report only
     - Blocked-by: w1na5dg (Write tests for selection, de-duplication and splitting)
     - Stream: 1
     - Requirements: [1.3](requirements.md#1.3), [1.4](requirements.md#1.4), [1.5](requirements.md#1.5), [2.4](requirements.md#2.4), [2.5](requirements.md#2.5), [2.6](requirements.md#2.6), [2.7](requirements.md#2.7), [2.8](requirements.md#2.8)
 
-- [ ] 7. Attribution, registration and forgetting <!-- id:w1na5di -->
+- [x] 7. Attribution, registration and forgetting <!-- id:w1na5di -->
   - Blocked-by: w1na5df (Session selection, dedupe and splitting)
   - Stream: 1
   - Requirements: [2.2](requirements.md#2.2), [2.3](requirements.md#2.3), [2.9](requirements.md#2.9), [2.10](requirements.md#2.10), [2.11](requirements.md#2.11), [14.8](requirements.md#14.8)
-  - [ ] 7.1. Write tests for attribution, registration and forgetting <!-- id:w1na5dj -->
+  - [x] 7.1. Write tests for attribution, registration and forgetting <!-- id:w1na5dj -->
     - Harness, model per entry, provider, local/cloud, project (worktree counts as parent), domain, workflow; unmapped sources listed; non-interactive and registered sessions present prompts as role `tool` except user-quote entries; late registration reclassifies and marks items pending reassessment; forget/restore properties from the design (counts and rankings equal the non-forgotten computation; restore returns original values; repeat calls change nothing; selection and registration reject forgotten sessions)
     - Blocked-by: w1na5df (Session selection, dedupe and splitting)
     - Stream: 1
     - Requirements: [2.2](requirements.md#2.2), [2.3](requirements.md#2.3), [2.9](requirements.md#2.9), [2.10](requirements.md#2.10), [2.11](requirements.md#2.11), [14.8](requirements.md#14.8)
-  - [ ] 7.2. Implement attribution, registration and forget/restore <!-- id:w1na5dk -->
+  - [x] 7.2. Implement attribution, registration and forget/restore <!-- id:w1na5dk -->
     - registrations table keyed by (tool, run ref, session); forgotten flag filtered in every count, ranking, rate and replay query; items left without 4.5 or 13.3 support withheld at once; forgotten observations never passed to a role
     - Blocked-by: w1na5dj (Write tests for attribution, registration and forgetting)
     - Stream: 1

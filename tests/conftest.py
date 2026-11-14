@@ -8,6 +8,8 @@ from pathlib import Path
 
 import pytest
 
+from dreaming import config, store
+
 FAKES = Path(__file__).parent / "fakes"
 
 
@@ -55,3 +57,16 @@ def fakes(tmp_path, monkeypatch):
     monkeypatch.setenv("FAKE_SCENARIO", str(result.scenario_path))
     monkeypatch.setenv("FAKE_LOG", str(result.log_path))
     return result
+
+
+@pytest.fixture
+def home():
+    """The private home, created."""
+    return config.ensure_home()
+
+
+@pytest.fixture
+def db(home):
+    conn = store.open_store(home / "dreaming.db")
+    yield conn
+    conn.close()
