@@ -47,7 +47,7 @@ The skill reaches the program only through the installed `dream` command and `dr
 
 ### Versioned installs (7.3)
 
-`make install-dreaming` installs the package into `~/.dreaming/versions/<revision>/` and repoints `~/.dreaming/current`. `~/.local/bin/dream` is a launcher that runs `current` for a new run and the run's recorded revision on resume. Adoption of dreaming's own code deploys a new version for the next run; the running or resumed run keeps its revision. A version directory is deleted only when no unfinished run records it. Schema migrations are additive within a major version and run only when no unfinished run exists; otherwise the newer command refuses with `migration_blocked` naming the run.
+`make install` installs the committed `HEAD` into `~/.dreaming/versions/<revision>/` and repoints `~/.dreaming/current`. `~/.local/bin/dream` is a launcher that runs `current` for a new run and the run's recorded revision on resume; while a run is unfinished, every invocation runs that run's version (Q87). Adoption of dreaming's own code deploys a new version for the next run; the running or resumed run keeps its revision. A version directory is deleted only when no unfinished run records it. Schema migrations are additive within a major version and run only when no unfinished run exists; otherwise the newer command refuses with `migration_blocked` naming the run.
 
 ### Instruction set and snapshot (7.1, 7.3)
 
@@ -119,7 +119,7 @@ class CallResult:
 
 ### Steps and plan view (`steps.py`, `plan.py`)
 
-The `steps` table is the only record of what a dream will do and has done: `(run, key, phase, depends_on, state, attempts, input_ref)`, where `key` is a stable identifier the runner assigns (for example `read:<batch>`, `research:<question hash>`, `author:<candidate>`, `adopt:<group>`) and `state` is `pending|running|done|failed|skipped`. Phases: Read (one step per session batch), Review, Research (one per question), Author (one per candidate; begins with a verify action, see Review), Adopt (one per linked group of repositories, unlinked repositories being groups of one). Review depends on all Read steps. The next step is the first `pending` one whose dependencies are `done`. The report is not a step: it runs in the exit path so a budget-exhausted or failed run still produces it (10.1). Hitting a limit or an interrupt is checked between steps and never kills a running check, merge or deploy.
+The `steps` table is the only record of what a dream will do and has done: `(run, key, phase, depends_on, state, attempts, input_ref)`, where `key` is a stable identifier the runner assigns (for example `read:<batch>`, `research:<question hash>`, `author:<candidate>`, `adopt:<group>`) and `state` is `pending|running|done|failed|skipped`. Phases: Read (one step per session batch), Review, Research (one per question), Author (one per candidate; begins with a verify action, see Review), Adopt (one per linked group of repositories, unlinked repositories being groups of one). Review depends on all Read steps. The next step is the first `pending` one whose dependencies have finished (`done`, `failed` or `skipped`, Q82). The report is not a step: it runs in the exit path so a budget-exhausted or failed run still produces it (10.1). Hitting a limit or an interrupt is checked between steps and before each model call (Q83) and never kills a running call, check, merge or deploy.
 
 Contract: a step's follow-up steps are inserted in the same SQLite transaction that applies its results and marks it `done`. The raw model output is stored on the `calls` row as soon as the call returns; on resume, a step with stored raw output and no `done` state applies that output without calling a model, so a crash cannot produce a second, different answer. Re-sizing on resume (5.4) rewrites only `pending` Read steps. SQLite runs in WAL mode with a busy timeout, because `dream api` writes (feedback, registration) while a dream runs.
 
@@ -136,7 +136,7 @@ Start sequence:
 
 Every other process spawned by the child (model calls, checks, deploy commands) is started with `close_fds=True` so it does not inherit the descriptor. A surviving grandchild would otherwise keep the lock after the child died and block resume.
 
-Any `dream` invocation that would resume a run takes the same non-blocking lock. If it gets the lock while a run row says `running`, the owning process is gone and the run is `interrupted`: the invocation kills any survivor in the recorded process group, then resumes (1.6). `dream api` reads and the knowledge operations take no lock; SQLite WAL (see Steps) covers their concurrent writes. The lock is local-filesystem only; `DREAMING_HOME` is on local disk (flock is unreliable on network filesystems).
+Any `dream` invocation that would resume a run takes the same non-blocking lock. If it gets the lock while a run row says `running`, the owning process is gone and the run is `interrupted`: the invocation kills any survivor in the recorded process group, then resumes (1.6). The recorded group is the detached child's; model calls and checks run in process groups of their own so a timeout can kill each as a group, and an orphaned call is therefore not killed by a resume, though it holds no lock (Q88). `dream api` reads and the knowledge operations take no lock; SQLite WAL (see Steps) covers their concurrent writes. The lock is local-filesystem only; `DREAMING_HOME` is on local disk (flock is unreliable on network filesystems).
 
 ### Selection and reading (`sessions.py`, 1.x–3.x)
 
@@ -248,7 +248,7 @@ Effect measurement (11.1): for each applied change, count observations of its pa
 | Process gone while holding the lock | The kernel releases the flock; run resumes if interrupted (1.6) |
 | Migration while a run is unfinished | Refused with `migration_blocked` naming the run; resume or discard it first |
 
-Exit codes follow screw except for budget exhaustion: 0 success (including `budget_exhausted`), 1 failure, 2 usage or config, 4 skipped (already running), 5 partial. When a run reaches its own limit after `partial` work, the status is `partial` and the exit is 5.
+Exit codes follow screw except for budget exhaustion: 0 success (including `budget_exhausted`), 1 failure, 2 usage or config, 4 skipped (already running), 5 partial. A run stopped by an error stays `interrupted` with the error on its row, so it can be resumed or discarded (Q85). When a run reaches its own limit after `partial` work, the status is `partial` and the exit is 5.
 
 
 ## Risks and Assumptions

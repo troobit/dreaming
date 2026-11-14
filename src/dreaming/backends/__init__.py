@@ -7,6 +7,28 @@ import signal
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Protocol
+
+
+@dataclass
+class CallResult:
+    """One answered model call (design, Roles and calls)."""
+
+    output: dict
+    tokens_in: int
+    tokens_out: int
+    usage_estimated: bool = False
+    session_ref: str = ""  # harness session id, or LM Studio thread id == run id
+    model: str | None = None
+
+
+class Backend(Protocol):
+    name: str
+    context_tokens: int
+
+    def call(
+        self, role: str, prompt: str, schema: dict, tools: list[str]
+    ) -> CallResult: ...
 
 
 def estimate_tokens(*texts: str) -> int:

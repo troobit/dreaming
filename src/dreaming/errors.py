@@ -24,3 +24,11 @@ class DreamingError(Exception):
         self.exit_code = exit_code
         self.code = code
         super().__init__(message)
+
+
+class Partial(DreamingError):
+    """No backend is left for a role: the run saves its progress and ends partial
+    (5.3)."""
+
+    def __init__(self, message: str) -> None:
+        super().__init__(message, PARTIAL, "partial")

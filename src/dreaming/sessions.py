@@ -530,6 +530,18 @@ class SelectionRequest:
     def explicit(self) -> bool:
         return bool(self.since or self.until or self.project or self.reread)
 
+    @classmethod
+    def from_dict(cls, selection: Mapping) -> SelectionRequest:
+        """The request as a run records it (`runs.selection`)."""
+        scope = selection.get("scope")
+        return cls(
+            since=parse_time(selection.get("since")),
+            until=parse_time(selection.get("until")),
+            project=selection.get("project"),
+            reread=bool(selection.get("reread")),
+            scope=Scope(**scope) if scope else None,
+        )
+
 
 # Attribution (2.2, 2.3, 2.9)
 

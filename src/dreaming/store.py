@@ -20,6 +20,7 @@ from pathlib import Path
 from dreaming.errors import FAILURE, DreamingError
 
 BUSY_TIMEOUT_SECONDS = 30.0
+STORE_NAME = "dreaming.db"
 
 RUN_STATUSES = (
     "running",
@@ -349,7 +350,15 @@ ALTER TABLE sessions_seen ADD COLUMN size_bytes INTEGER;
 ALTER TABLE sessions_seen ADD COLUMN request_count INTEGER;
 """
 
-MIGRATIONS: list[str] = [_SCHEMA_V1, _SCHEMA_V2]
+# The run engine: step order, wall-clock time spent running (1.2) and why a run
+# stopped short.
+_SCHEMA_V3 = """
+ALTER TABLE steps ADD COLUMN seq INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE runs ADD COLUMN active_seconds REAL NOT NULL DEFAULT 0;
+ALTER TABLE runs ADD COLUMN error TEXT;
+"""
+
+MIGRATIONS: list[str] = [_SCHEMA_V1, _SCHEMA_V2, _SCHEMA_V3]
 
 
 def statements(script: str) -> list[str]:
@@ -362,6 +371,10 @@ def statements(script: str) -> list[str]:
                 result.append(pending.strip())
             pending = ""
     return result
+
+
+def store_path(home: Path) -> Path:
+    return home / STORE_NAME
 
 
 def connect(path: Path) -> sqlite3.Connection:
@@ -421,6 +434,20 @@ def migrate(conn: sqlite3.Connection, migrations: Sequence[str] = MIGRATIONS) ->
             for statement in statements(migrations[number]):
                 conn.execute(statement)
         conn.execute(f"PRAGMA user_version = {target}")
+
+
+def memory_copy(path: Path) -> sqlite3.Connection:
+    """A migrated in-memory copy of the store, or an empty store when there is
+    none, for reading without changing anything on disk (1.7)."""
+    copy = connect(Path(":memory:"))
+    if path.exists():
+        source = sqlite3.connect(path)
+        try:
+            source.backup(copy)
+        finally:
+            source.close()
+    migrate(copy)
+    return copy
 
 
 def open_store(

@@ -14,5 +14,7 @@ test-live:
 
 check: lint test
 
+# Installs the committed HEAD into ~/.dreaming/versions/<revision>/ and links
+# ~/.local/bin/dream to the launcher (7.3).
 install:
-	uv tool install --force .
+	uv run python -m dreaming.versions install
