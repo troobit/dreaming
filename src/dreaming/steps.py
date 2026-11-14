@@ -170,16 +170,19 @@ def begin_call(
     backend: str,
     now: str,
     input_ref: str | None = None,
+    harness_session_id: str | None = None,
 ) -> int:
-    """Write the calls row before the call is made."""
+    """Write the calls row before the call is made, with the harness session id
+    when one is chosen beforehand, so the call's session is known even if the
+    process dies during it (1.5)."""
     attempt = conn.execute(
         "SELECT COUNT(*) + 1 FROM calls WHERE run = ? AND step_key = ?",
         (run_id, key),
     ).fetchone()[0]
     cursor = conn.execute(
         "INSERT INTO calls (run, step_key, attempt, role, backend, input_ref,"
-        " started_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
-        (run_id, key, attempt, role, backend, input_ref, now),
+        " harness_session_id, started_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        (run_id, key, attempt, role, backend, input_ref, harness_session_id, now),
     )
     return cursor.lastrowid
 
@@ -192,7 +195,9 @@ def end_call(
     result: CallResult | None = None,
     error: str | None = None,
 ) -> None:
-    """Store the raw output, or the error, as soon as the call returns."""
+    """Store the raw output, or the error, as soon as the call returns. An
+    output with an error did not match its schema: it is kept and counted, but
+    its outcome is `invalid`, so a resume never applies it."""
     if result is None:
         conn.execute(
             "UPDATE calls SET outcome = 'error', error = ?, seconds = ?, ended_at = ?"
@@ -201,10 +206,12 @@ def end_call(
         )
         return
     conn.execute(
-        "UPDATE calls SET outcome = 'ok', raw_output = ?, tokens_in = ?,"
+        "UPDATE calls SET outcome = ?, error = ?, raw_output = ?, tokens_in = ?,"
         " tokens_out = ?, usage_estimated = ?, session_ref = ?, model = ?,"
         " seconds = ?, ended_at = ? WHERE id = ?",
         (
+            "invalid" if error else "ok",
+            error,
             json.dumps(result.output),
             result.tokens_in,
             result.tokens_out,

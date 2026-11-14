@@ -26,14 +26,24 @@ import sqlite3
 import subprocess
 import sys
 import traceback
+import uuid
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Protocol
 
 from dreaming import config, sessions, steps, store, versions
-from dreaming.backends import Backend, CallResult, probe
+from dreaming.backends import (
+    Backend,
+    BackendError,
+    CallResult,
+    Dispatcher,
+    InputFailed,
+    SchemaError,
+    estimate_tokens,
+    probe,
+)
 from dreaming.budget import Budget, LimitReached, SystemClock, WallClock
 from dreaming.errors import (
     FAILURE,
@@ -44,6 +54,7 @@ from dreaming.errors import (
     DreamingError,
     Partial,
 )
+from dreaming.schema import validate
 from dreaming.steps import NewStep, Step
 
 LOCK_NAME = "lock"
@@ -228,15 +239,20 @@ class Context:
         input_ref: str | None = None,
     ) -> dict:
         """The answer to one call of this step: the stored one if the call was
-        already answered, otherwise a new call."""
+        already answered, otherwise a new call through the dispatcher's retry
+        and fallback policy."""
         key = steps.call_key(self.step.key, part)
         stored = steps.stored_output(self.conn, self.run_id, key)
         if stored is not None:
             return stored
-        backends = self.backends(role)
-        if not backends:
-            raise Partial(f"no backend is available for the {role} role")
-        return self.attempt(key, role, backends[0], prompt, schema, input_ref).output
+        result = self.runner.dispatcher.call(
+            role,
+            self.backends(role),
+            lambda backend: self.attempt(key, role, backend, prompt, schema, input_ref),
+            self.wait_until,
+            self.clock.now,
+        )
+        return result.output
 
     def attempt(
         self,
@@ -249,10 +265,13 @@ class Context:
     ) -> CallResult:
         """One recorded call: the row is written before it and the raw output as
         soon as it returns. No call starts once a limit is reached or the run is
-        told to stop."""
+        told to stop. Missing usage is estimated, and the output is checked
+        against the schema whatever the backend's structured-output option
+        did."""
         if self.runner.stopping:
             raise _Interrupted
         self.runner.budget.check(self.step.phase if self.step else "")
+        session_id = str(uuid.uuid4()) if backend.accepts_session_id else None
         call_id = steps.begin_call(
             self.conn,
             self.run_id,
@@ -261,11 +280,12 @@ class Context:
             backend.name,
             self.runner.now(),
             input_ref,
+            session_id,
         )
         started = self.clock.monotonic()
         tools = list(self.cfg["tools"][role])
         try:
-            result = backend.call(role, prompt, schema, tools)
+            result = backend.call(role, prompt, schema, tools, session_id=session_id)
         except Exception as exc:
             seconds = self.clock.monotonic() - started
             steps.end_call(
@@ -273,7 +293,18 @@ class Context:
             )
             raise
         seconds = self.clock.monotonic() - started
-        steps.end_call(self.conn, call_id, self.runner.now(), seconds, result=result)
+        result = _with_usage(result, prompt)
+        problems = "; ".join(validate(result.output, schema))
+        steps.end_call(
+            self.conn,
+            call_id,
+            self.runner.now(),
+            seconds,
+            result=result,
+            error=problems or None,
+        )
+        if problems:
+            raise SchemaError(problems)
         return result
 
     def wait_until(self, until: datetime, notice: dict) -> None:
@@ -308,8 +339,27 @@ class Context:
             raise _Interrupted
 
 
+def _with_usage(result: CallResult, prompt: str) -> CallResult:
+    """The result with usage the backend did not report estimated as
+    `ceil(utf8 bytes / 4)` of the prompt and the output, and flagged (1.2)."""
+    if result.tokens_in is not None and result.tokens_out is not None:
+        return result
+    return replace(
+        result,
+        tokens_in=(
+            estimate_tokens(prompt) if result.tokens_in is None else result.tokens_in
+        ),
+        tokens_out=(
+            estimate_tokens(json.dumps(result.output))
+            if result.tokens_out is None
+            else result.tokens_out
+        ),
+        usage_estimated=True,
+    )
+
+
 def _describe(exc: BaseException) -> str:
-    if isinstance(exc, DreamingError):
+    if isinstance(exc, DreamingError | BackendError):
         return exc.message
     return f"{type(exc).__name__}: {exc}"
 
@@ -345,6 +395,10 @@ class Runner:
         ).fetchone()[0]
         self.wall = WallClock(spent, self.clock.monotonic)
         self.budget = Budget(conn, run_id, cfg["budget"], self.wall)
+        self.dispatcher = Dispatcher(cfg["thresholds"])
+        # Steps whose input failed, by the backend it failed on; given another
+        # chance when the breaker disables that backend.
+        self.failed_on: dict[str, set[str]] = {}
         self.stopping = False
 
     def stop(self) -> None:
@@ -391,6 +445,7 @@ class Runner:
                 steps.add(self.conn, self.run_id, planned)
         exhausted = self._exhausted_before(loaded)
         while not self.stopping:
+            self._retry_tripped()
             step = steps.next_ready(self.conn, self.run_id)
             if step is None:
                 self._check_blocked()
@@ -435,6 +490,13 @@ class Runner:
         except Partial:
             steps.finish(self.conn, self.run_id, step.key, "pending")
             raise
+        except InputFailed as failed:
+            self.failed_on.setdefault(failed.backend, set()).add(step.key)
+            with store.transaction(self.conn):
+                steps.finish(self.conn, self.run_id, step.key, "failed", failed.message)
+                self.save_clock()
+            log(f"{step.key} failed: {failed.message}")
+            return
         with store.transaction(self.conn):
             outcome = phase.apply(self.conn, step, prepared)
             steps.add(self.conn, self.run_id, outcome.follow_up)
@@ -443,6 +505,15 @@ class Runner:
             )
             self.save_clock()
         log(f"{step.key} {outcome.state}")
+
+    def _retry_tripped(self) -> None:
+        """Inputs that failed on a backend the breaker has since disabled are
+        pending again, for the role's next backend (design, Roles and calls)."""
+        while self.dispatcher.tripped:
+            backend = self.dispatcher.tripped.pop()
+            for key in sorted(self.failed_on.pop(backend, ())):
+                steps.finish(self.conn, self.run_id, key, "pending")
+                log(f"{key} pending again: {backend} is disabled")
 
     def _check_blocked(self) -> None:
         blocked = [

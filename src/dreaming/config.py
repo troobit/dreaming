@@ -21,6 +21,11 @@ from dreaming.errors import USAGE_ERROR, DreamingError
 ROLES = ("reader", "reviewer", "researcher", "author", "replayer")
 HARNESSES = ("claude", "codex", "lmstudio")
 AGENT_LAUNCH_TOOLS = ("codex-agent", "gemini-agent")
+# Roles that get no tools at all (4.4); the replayer also has no network.
+TOOL_FREE_ROLES = ("reader", "reviewer", "replayer")
+# File tools every harness provides; any other tool is `<server>.<tool>` from the
+# shared MCP definitions (4.4).
+BUILTIN_TOOLS = ("read", "grep", "glob", "edit", "write")
 PROPOSALS = ("knowledge", "learning", "change")
 FRACTIONS = {
     "review_author_reserve",
@@ -71,6 +76,9 @@ DEFAULTS: dict[str, Any] = {
     "instructions": {"repo": "", "branch": "main"},
     "apsis": {"command": "apsis", "codex_exec_dirs": [], "lmstudio_log_dir": ""},
     "knowledge_folders": [],
+    # The shared MCP definitions (agentic-coding's mcp/servers.json); a call gets
+    # only the servers and tools its role lists.
+    "mcp": {"servers_file": ""},
     "tools": {
         "reader": [],
         "reviewer": [],
@@ -336,8 +344,17 @@ def _check_tools(cfg: dict) -> None:
         for tool in tools:
             if any(blocked in tool for blocked in AGENT_LAUNCH_TOOLS):
                 raise _invalid(f"tools.{role}", f"{tool} launches other agents (4.4)")
+            server, _, name = tool.partition(".")
+            if tool not in BUILTIN_TOOLS and not (server and name):
+                raise _invalid(
+                    f"tools.{role}",
+                    f"{tool} is neither a file tool ({', '.join(BUILTIN_TOOLS)}) "
+                    "nor <server>.<tool> from the shared MCP definitions",
+                )
         if not tools:
             continue
+        if role in TOOL_FREE_ROLES:
+            raise _invalid(f"tools.{role}", f"must be empty; the {role} gets no tools")
         for name in cfg["roles"][role]["backends"]:
             if cfg["backends"][name]["harness"] == "lmstudio":
                 raise _invalid(
@@ -419,6 +436,12 @@ def role_backends(cfg: dict, role: str) -> list[dict]:
         {"name": name, **cfg["backends"][name]}
         for name in cfg["roles"][role]["backends"]
     ]
+
+
+def role_context_tokens(cfg: dict, role: str) -> int:
+    """The smallest context in the role's fallback list; the role's inputs are
+    sized for it, so any backend in the list can take them (5.2)."""
+    return min(backend["context_tokens"] for backend in role_backends(cfg, role))
 
 
 def classify_locality(cfg: dict, provider: str | None, model: str | None) -> str:

@@ -20,6 +20,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from dreaming.backends import (
+    Backend,
     claude,
     codex,
     estimate_tokens,
@@ -266,16 +267,6 @@ def _probe_claude(
     return _give_up(attempts)
 
 
-def _isolated_codex_home(home: Path) -> Path:
-    """An empty `CODEX_HOME` that keeps the user's login through a link to auth.json."""
-    isolated = home / "codex-home"
-    isolated.mkdir(exist_ok=True)
-    auth, link = codex.user_codex_home() / "auth.json", isolated / "auth.json"
-    if auth.exists() and not link.is_symlink():
-        link.symlink_to(auth)
-    return isolated
-
-
 def _probe_codex(
     home: Path, cfg: dict, name: str, backend: dict, version: str
 ) -> ProbeResult:
@@ -287,7 +278,7 @@ def _probe_codex(
         ("user-home", dict(os.environ)),
         (
             "isolated-home",
-            {**os.environ, "CODEX_HOME": str(_isolated_codex_home(home))},
+            {**os.environ, "CODEX_HOME": str(codex.isolated_home(home))},
         ),
     )
     attempts = []
@@ -374,16 +365,11 @@ def _probe_lmstudio(
     result = ProbeResult(name, "lmstudio", version, isolation="direct")
     base_url = backend["base_url"] or lmstudio.DEFAULT_URL
     try:
-        models = lmstudio.list_models(base_url, timeout=10)
+        model, _ = lmstudio.loaded_model(
+            base_url, backend["model"], lmstudio.MODELS_TIMEOUT_SECONDS
+        )
     except lmstudio.LMStudioError as exc:
         result.status, result.reason = "unavailable", f"LM Studio at {base_url}: {exc}"
-        return result
-    model = backend["model"]
-    if (model and model not in models) or not models:
-        result.status = "unavailable"
-        result.reason = (
-            f"model {model or '(any)'} is not loaded in LM Studio at {base_url}"
-        )
         return result
 
     thread_id = f"dream-probe-{uuid.uuid4().hex}"
@@ -426,6 +412,11 @@ def _probe_lmstudio(
 
 
 _PROBES = {"claude": _probe_claude, "codex": _probe_codex, "lmstudio": _probe_lmstudio}
+_ADAPTERS = {
+    "claude": claude.ClaudeBackend,
+    "codex": codex.CodexBackend,
+    "lmstudio": lmstudio.LMStudioBackend,
+}
 
 
 def probe_backend(home: Path, cfg: dict, name: str) -> ProbeResult:
@@ -461,6 +452,16 @@ def cached_status(home: Path, cfg: dict, name: str) -> ProbeResult:
         version,
         status="unprobed",
         reason="not probed at this version and configuration",
+    )
+
+
+def adapter(home: Path, cfg: dict, run_id: str, result: ProbeResult) -> Backend | None:
+    """The callable backend for a probed one, using the isolation flags its probe
+    confirmed, or None when the probe found it unusable (5.5)."""
+    if not result.usable:
+        return None
+    return _ADAPTERS[result.harness](
+        cfg, result.backend, home=home, run_id=run_id, isolation=result.isolation
     )
 
 

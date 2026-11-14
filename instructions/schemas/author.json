@@ -1,0 +1,219 @@
+{
+  "type": "object",
+  "properties": {
+    "verification": {
+      "type": "object",
+      "properties": {
+        "supported": {
+          "type": "boolean",
+          "description": "Whether the cited evidence still supports the candidate against the current files."
+        },
+        "reason": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "supported",
+        "reason"
+      ],
+      "additionalProperties": false
+    },
+    "outcome": {
+      "type": "string",
+      "enum": [
+        "change",
+        "learning",
+        "defer"
+      ]
+    },
+    "changes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "repo": {
+            "type": "string"
+          },
+          "summary": {
+            "type": "string"
+          },
+          "commit_message": {
+            "type": "string",
+            "description": "A one-line subject, then a body citing the evidence ids."
+          },
+          "depends_on": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Repositories whose change this one needs."
+          },
+          "evidence": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "edits": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "path": {
+                  "type": "string",
+                  "description": "A path relative to the repository root."
+                },
+                "section": {
+                  "type": "string",
+                  "description": "The heading or rule id the edit changes or follows."
+                },
+                "action": {
+                  "type": "string",
+                  "enum": [
+                    "add",
+                    "replace",
+                    "delete"
+                  ]
+                },
+                "text": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "The new text; null for delete."
+                },
+                "supporting": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "Evidence ids of a case the edit would have helped."
+                },
+                "counter": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "Evidence ids of a case where it must not apply, if any."
+                },
+                "applies_when": {
+                  "type": "string",
+                  "description": "The boundary of the edit: when it applies and when it does not."
+                }
+              },
+              "required": [
+                "path",
+                "section",
+                "action",
+                "text",
+                "supporting",
+                "counter",
+                "applies_when"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "repo",
+          "summary",
+          "commit_message",
+          "depends_on",
+          "evidence",
+          "edits"
+        ],
+        "additionalProperties": false
+      },
+      "description": "Empty unless outcome is change; then exactly one change."
+    },
+    "learning": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "summary": {
+            "type": "string"
+          },
+          "next_step": {
+            "type": "string",
+            "description": "One concrete thing to read, try or practise."
+          },
+          "helps_achieve": {
+            "type": "string",
+            "description": "The outcome the learning would help achieve."
+          },
+          "scope": {
+            "type": "object",
+            "description": "Where the item applies; missing scope is never global.",
+            "properties": {
+              "domains": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "projects": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "workflows": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "global": {
+                "type": "boolean",
+                "description": "True only when the evidence shows the item applies everywhere."
+              },
+              "unresolved": {
+                "type": "boolean",
+                "description": "True when the evidence does not show where the item applies."
+              }
+            },
+            "required": [
+              "domains",
+              "projects",
+              "workflows",
+              "global",
+              "unresolved"
+            ],
+            "additionalProperties": false
+          },
+          "evidence": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "research": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Research finding ids used."
+          }
+        },
+        "required": [
+          "summary",
+          "next_step",
+          "helps_achieve",
+          "scope",
+          "evidence",
+          "research"
+        ],
+        "additionalProperties": false
+      },
+      "description": "Empty unless outcome is learning; then exactly one recommendation."
+    }
+  },
+  "required": [
+    "verification",
+    "outcome",
+    "changes",
+    "learning"
+  ],
+  "additionalProperties": false
+}

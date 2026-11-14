@@ -68,10 +68,10 @@ def test_live_codex(live_home):
 
 def _loaded_lmstudio_model():
     try:
-        models = probe.lmstudio.list_models(LMSTUDIO_URL, timeout=2)
+        model, _ = probe.lmstudio.loaded_model(LMSTUDIO_URL, "", timeout=2)
     except probe.lmstudio.LMStudioError:
         return None
-    return models[0] if models else None
+    return model
 
 
 def test_live_lmstudio_direct(live_home):

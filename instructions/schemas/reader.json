@@ -1,0 +1,78 @@
+{
+  "type": "object",
+  "properties": {
+    "observations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "entry_id": {
+            "type": "string",
+            "description": "The id of the one entry the quote is copied from."
+          },
+          "quote": {
+            "type": "string",
+            "description": "Text copied exactly from that entry's text."
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "user_statement",
+              "tool_prompt",
+              "assistant_suggestion",
+              "tool_result"
+            ]
+          },
+          "modality": {
+            "type": "string",
+            "enum": [
+              "asserted",
+              "hedged",
+              "tentative"
+            ],
+            "description": "How firmly the source text states it."
+          },
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "user_confirmed",
+              "check_confirmed",
+              "failed",
+              "unknown"
+            ]
+          },
+          "outcome_entry_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The entry that shows the outcome, or null when it is unknown."
+          },
+          "lens": {
+            "type": "string",
+            "description": "The id of the lens that looks for this."
+          },
+          "pattern_key": {
+            "type": "string",
+            "description": "A short lowercase phrase naming the recurring thing, worded the same way every time it recurs."
+          }
+        },
+        "required": [
+          "entry_id",
+          "quote",
+          "kind",
+          "modality",
+          "outcome",
+          "outcome_entry_id",
+          "lens",
+          "pattern_key"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": [
+    "observations"
+  ],
+  "additionalProperties": false
+}

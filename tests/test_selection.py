@@ -20,7 +20,7 @@ from sessiondocs import (
     selected_ids,
 )
 
-from dreaming import config, sessions
+from dreaming import config, roles, sessions
 from dreaming.config import Lens
 from dreaming.errors import DreamingError
 
@@ -365,7 +365,7 @@ def test_reader_parts_are_sized_for_the_smallest_reader_context():
             "roles": {"reader": {"backends": ["big", "small"]}},
         }
     )
-    assert sessions.reader_part_tokens(cfg, prompt_tokens=3000) == 5000
+    assert roles.input_tokens(cfg, "reader", "x" * 4_000) == 8_000 - 2_000 - 1_000
 
 
 def test_a_session_that_fits_is_one_part():

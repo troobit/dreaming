@@ -1,10 +1,9 @@
 """Backend probes for isolation and structured output (1.7, 4.4, 5.5, 5.7, 5.8)."""
 
 import json
-import threading
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import pytest
+from lmstudio_fake import FakeLMStudio, model
 
 from dreaming import cli, config
 from dreaming.backends import probe
@@ -261,55 +260,21 @@ context_tokens = 32768
 # LM Studio direct
 
 
-class _LMStudio(BaseHTTPRequestHandler):
-    models = ["qwen3"]
-    bodies: list[bytes] = []
-    thread_log = None
-
-    def log_message(self, *args):
-        pass
-
-    def _reply(self, payload):
-        data = json.dumps(payload).encode()
-        self.send_response(200)
-        self.send_header("Content-Type", "application/json")
-        self.send_header("Content-Length", str(len(data)))
-        self.end_headers()
-        self.wfile.write(data)
-
-    def do_GET(self):
-        self._reply({"data": [{"id": model} for model in self.models]})
-
-    def do_POST(self):
-        body = self.rfile.read(int(self.headers["Content-Length"]))
-        type(self).bodies.append(body)
-        thread = json.loads(body)["client_metadata"]["thread_id"]
-        with open(self.thread_log, "a") as log:
-            log.write(thread + "\n")
-        content = json.dumps({"ok": True})
-        usage = {"prompt_tokens": 12, "completion_tokens": 4}
-        self._reply({"choices": [{"message": {"content": content}}], "usage": usage})
-
-
 @pytest.fixture
 def lmstudio(tmp_path, fakes):
-    _LMStudio.bodies = []
-    _LMStudio.thread_log = str(tmp_path / "lmstudio-threads")
-    fakes.scenario(lmstudio_log=_LMStudio.thread_log)
-    server = ThreadingHTTPServer(("127.0.0.1", 0), _LMStudio)
-    thread = threading.Thread(target=server.serve_forever, daemon=True)
-    thread.start()
-    yield f"http://127.0.0.1:{server.server_address[1]}"
-    server.shutdown()
+    server = FakeLMStudio(thread_log=str(tmp_path / "lmstudio-threads")).start()
+    fakes.scenario(lmstudio_log=server.thread_log)
+    yield server
+    server.stop()
 
 
-def _lmstudio_config(isolated_home, url, model="qwen3"):
+def _lmstudio_config(isolated_home, url, model_id="qwen3"):
     return _config(
         isolated_home,
         f"""
 [backends.direct]
 harness = "lmstudio"
-model = "{model}"
+model = "{model_id}"
 base_url = "{url}"
 context_tokens = 32768
 """,
@@ -317,7 +282,7 @@ context_tokens = 32768
 
 
 def test_direct_lmstudio_probe(isolated_home, lmstudio):
-    home, cfg = _lmstudio_config(isolated_home, lmstudio)
+    home, cfg = _lmstudio_config(isolated_home, lmstudio.url)
     result = probe.probe_backend(home, cfg, "direct")
 
     assert result.status == "probed"
@@ -327,7 +292,7 @@ def test_direct_lmstudio_probe(isolated_home, lmstudio):
     assert result.apsis_finds_session is True
     assert result.usable
     assert result.tokens_in == 12 and result.tokens_out == 4
-    (body,) = _LMStudio.bodies
+    (body,) = lmstudio.bodies
     # The thread id leads the body so a truncated log entry still carries it (5.8).
     assert body.startswith(b'{"client_metadata": {"thread_id": "')
     assert json.loads(body)["client_metadata"]["thread_id"] == result.session_ref
@@ -336,11 +301,20 @@ def test_direct_lmstudio_probe(isolated_home, lmstudio):
 def test_direct_lmstudio_without_the_model_loaded_is_unavailable(
     isolated_home, lmstudio
 ):
-    home, cfg = _lmstudio_config(isolated_home, lmstudio, model="missing-model")
+    home, cfg = _lmstudio_config(isolated_home, lmstudio.url, model_id="missing-model")
     result = probe.probe_backend(home, cfg, "direct")
     assert result.status == "unavailable"
     assert "missing-model" in result.reason
-    assert _LMStudio.bodies == []
+    assert lmstudio.bodies == []
+
+
+def test_a_downloaded_model_that_is_not_loaded_is_unavailable(isolated_home, lmstudio):
+    """LM Studio would load it on request, and dreaming never loads a model."""
+    lmstudio.models = [model("qwen3", state="not-loaded")]
+    home, cfg = _lmstudio_config(isolated_home, lmstudio.url)
+    result = probe.probe_backend(home, cfg, "direct")
+    assert result.status == "unavailable"
+    assert lmstudio.bodies == []
 
 
 def test_unreachable_lmstudio_is_unavailable(isolated_home, fakes):

@@ -1,0 +1,106 @@
+{
+  "type": "object",
+  "properties": {
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "claim": {
+            "type": "string",
+            "description": "What the sources show, in one or two sentences."
+          },
+          "assessment": {
+            "type": "string",
+            "enum": [
+              "answers",
+              "outdated",
+              "contradicted",
+              "missing_practice",
+              "current"
+            ]
+          },
+          "equivalent_finding": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The id of an earlier finding for the same target that says the same, or null."
+          },
+          "sources": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "title": {
+                  "type": "string"
+                },
+                "link": {
+                  "type": "string",
+                  "description": "A URL, or a repository path with its revision."
+                },
+                "retrieved_on": {
+                  "type": "string",
+                  "description": "The date the source was read, YYYY-MM-DD."
+                },
+                "passage": {
+                  "type": "string",
+                  "description": "The passage relied on, copied exactly."
+                },
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "web",
+                    "pull_request",
+                    "repository",
+                    "knowledge_folder"
+                  ]
+                }
+              },
+              "required": [
+                "title",
+                "link",
+                "retrieved_on",
+                "passage",
+                "kind"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "claim",
+          "assessment",
+          "equivalent_finding",
+          "sources"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "unavailable": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "source": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "source",
+          "reason"
+        ],
+        "additionalProperties": false
+      },
+      "description": "Sources that could not be read; they are listed in the report and skipped."
+    }
+  },
+  "required": [
+    "findings",
+    "unavailable"
+  ],
+  "additionalProperties": false
+}

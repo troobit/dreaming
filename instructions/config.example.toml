@@ -22,6 +22,23 @@ branch = "main"
 [scan]
 names_file = "~/.config/dreaming/names.txt"   # outside every repository (9.12)
 
+# The shared MCP definitions. A call gets only the servers and tools its role
+# lists; a server's secret is read from <SERVER>_<SECRET> in the environment,
+# for example GITHUB_AUTH_TOKEN="Bearer <token>" for the GitHub server.
+[mcp]
+servers_file = "~/repos/agentic-coding/mcp/servers.json"
+
+# Tools per role: file tools (read, grep, glob, edit, write) or <server>.<tool>.
+# Readers, reviewers and replayers get none (4.4); agent-launching tools are
+# refused.
+[tools]
+researcher = [
+  "read", "grep", "glob",
+  "devtools.internet_search", "devtools.fetch_url",
+  "github.pull_request_read",   # pull-request review threads (4.6)
+]
+author = ["read", "grep", "glob", "edit", "write"]
+
 # Backends: a harness (claude, codex) or a direct LM Studio model for tool-free roles.
 [backends.claude]
 harness = "claude"

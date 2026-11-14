@@ -7,7 +7,7 @@ Tasks 1–5 of `specs/dreaming/tasks.md`.
 - `src/dreaming/config.py` holds the private home checks as well as config, lenses and the snapshot (the design has no `home.py`).
 - `src/dreaming/errors.py`: exit codes (0, 1, 2, 4, 5) and `DreamingError(message, exit_code, code)`; `code` is the stable `dream api` error code (`invalid_config`, `migration_blocked`, `incompatible_version`, `apsis_failed`, ...).
 - `src/dreaming/backends/__init__.py`: `run_process` runs every subprocess in its own process group with `close_fds=True` and kills the group on timeout. Later adapters should use it so the dream lock is never inherited.
-- `backends/claude.py`, `codex.py`, `lmstudio.py` currently hold only command builders and output parsers used by the probe; tasks 12 and 13 add `call()`.
+- `backends/claude.py`, `codex.py`, `lmstudio.py` hold the command builders and parsers the probe uses and the adapters' `call()`; see `backends-and-roles.md`.
 
 ## Store (`store.py`)
 
@@ -31,7 +31,7 @@ Tasks 1–5 of `specs/dreaming/tasks.md`.
 - Codex isolated home: `~/.dreaming/codex-home` with `auth.json` symlinked to the user's. If Codex replaces the link with a file (a token refresh), that isolation set is refused, because the user's copy may now be stale.
 - Live findings, 2026-11-14 (Q81): claude 2.1.311 with `--safe-mode` passes every check. codex-cli 0.169.0 lists bundled skills under every flag tried, including an empty `CODEX_HOME`, so `make test-live` fails `test_live_codex` on purpose until that changes. `--disable apps` removes the `mcp__codex_apps__*` namespace.
 - Usage accounting: Claude `input_tokens` excludes cache reads and writes (they are added); Codex `cached_input_tokens` is a subset of `input_tokens` (not added).
-- Direct LM Studio probe thread ids are `dream-probe-<hex>`. Session selection (task 6) should treat `dream-` thread ids as the dream's own.
+- Direct LM Studio probe thread ids are `dream-probe-<hex>`. Session selection (task 6) should treat `dream-` thread ids as the dream's own. The probe checks the model is loaded through `/api/v0/models`, never `/v1/models`, which lists every downloaded model when LM Studio loads on demand.
 
 ## apsis client (`sessions.py`)
 

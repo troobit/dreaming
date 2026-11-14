@@ -12,7 +12,7 @@ Tasks 8–10 of `specs/dreaming/tasks.md`: `steps.py`, `budget.py`, `run.py`, `p
 ## Exactly-once calls
 
 - `ctx.call(role, prompt, schema, part=...)` keys each call as `step.key` or `step.key#part`. If a `calls` row with that key and `outcome = 'ok'` exists, its `raw_output` is returned and no model is asked. That is how a crash between the call and the commit resumes without a second, different answer.
-- `ctx.attempt` writes the calls row before the call and the raw output right after it (autocommit). The retry and fallback dispatcher (task 11) should wrap `attempt`, not `call`, so every attempt gets its own row and `budget.tokens_used` (the sum over `calls`) includes retries.
+- `ctx.attempt` writes the calls row before the call and the raw output right after it (autocommit). The retry and fallback dispatcher wraps `attempt`, not `call`, so every attempt gets its own row and `budget.tokens_used` (the sum over `calls`) includes retries (see `backends-and-roles.md`).
 - `steps.recover` runs at the start of every `execute`: `running` steps go back to `pending`, and calls without `ended_at` become `interrupted`.
 - `tests/test_steps.py::test_resume_after_any_crash_matches_an_uninterrupted_run` uses a `Crash(BaseException)` that nothing catches, so open transactions roll back as if the process died. Disabling the stored-output lookup makes it fail, which confirms the test can detect a double call.
 
@@ -20,7 +20,7 @@ Tasks 8–10 of `specs/dreaming/tasks.md`: `steps.py`, `budget.py`, `run.py`, `p
 
 - Limits are checked before each model-phase step and in `attempt` before every call (Q83). Total limits (tokens, wall clock) raise `LimitReached(exhausted=True)`: the step is `skipped`, model steps after it are skipped, `adopt` steps still run, and the run ends `budget_exhausted` (exit 0).
 - The Read share (Q84) only skips Read steps; the run carries on to Review.
-- Wall-clock time is `runs.active_seconds`, saved in each step's transaction. `ctx.wait_until` pauses it, sets the run `waiting` with `wait_until`/`wait_notice`, sleeps in 10 s chunks while checking `runner.stopping`, then sets it back to `running`. Task 11's usage-limit wait should call it.
+- Wall-clock time is `runs.active_seconds`, saved in each step's transaction. `ctx.wait_until` pauses it, sets the run `waiting` with `wait_until`/`wait_notice`, sleeps in 10 s chunks while checking `runner.stopping`, then sets it back to `running`. The dispatcher's usage-limit wait calls it.
 - Tests use `runkit.FakeClock` (time moves only when a fake call takes time or the run sleeps) and `FakeModel`, whose answer counts the calls it has answered.
 
 ## Lock and survivors

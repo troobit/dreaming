@@ -9,7 +9,12 @@ Scenario keys (all optional):
   skills, mcp_servers  lists reported in the init event
   structured         false: omit structured_output and print JSON as text
   fail               exit 1 with this message on stderr
-Every invocation is appended to FAKE_LOG as JSON (argv, cwd and selected env).
+  result_error       report this text as an error result and exit 1
+  answer             the structured output to return instead of the probe answer
+  no_usage           omit usage from the result
+  sleep              seconds to wait before answering
+Every invocation is appended to FAKE_LOG as JSON (argv, cwd, selected env and
+the prompt read from stdin).
 """
 
 from __future__ import annotations
@@ -17,15 +22,18 @@ from __future__ import annotations
 import json
 import os
 import sys
+import time
 from pathlib import Path
 
 
 def main() -> int:
     scenario = json.loads(Path(os.environ["FAKE_SCENARIO"]).read_text())
     args = sys.argv[1:]
+    stdin = sys.stdin.read()
     with open(os.environ["FAKE_LOG"], "a") as log:
         env = {k: v for k, v in os.environ.items() if k.startswith(("CLAUDE_", "ANTHROPIC_"))}
-        log.write(json.dumps({"tool": "claude", "argv": args, "cwd": os.getcwd(), "env": env}) + "\n")
+        entry = {"tool": "claude", "argv": args, "cwd": os.getcwd(), "env": env, "stdin": stdin}
+        log.write(json.dumps(entry) + "\n")
 
     if args == ["--version"]:
         print(scenario.get("version", "2.1.311 (Claude Code)"))
@@ -63,7 +71,7 @@ def main() -> int:
         "skills": scenario.get("skills", []),
         "model": "claude-test",
     }
-    answer = {"canary": canary, "tools": tools}
+    answer = scenario.get("answer", {"canary": canary, "tools": tools})
     result = {
         "type": "result",
         "subtype": "success",
@@ -74,10 +82,16 @@ def main() -> int:
     if scenario.get("structured", True):
         result["structured_output"] = answer
         result["result"] = ""
-    print(json.dumps(init))
+    if scenario.get("no_usage"):
+        del result["usage"]
+    if scenario.get("result_error"):
+        result.update(subtype="error", is_error=True, result=scenario["result_error"])
+        result.pop("structured_output", None)
+    print(json.dumps(init), flush=True)
+    time.sleep(scenario.get("sleep", 0))
     print(json.dumps({"type": "assistant", "session_id": session_id}))
     print(json.dumps(result))
-    return 0
+    return 1 if scenario.get("result_error") else 0
 
 
 if __name__ == "__main__":

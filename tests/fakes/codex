@@ -12,7 +12,12 @@ Scenario keys (all optional):
   exec_fail           `exec` prints a turn.failed event and exits 1
   fail_with_codex_home  `exec` fails as logged out when CODEX_HOME is set
   replace_auth_link   `exec` replaces $CODEX_HOME/auth.json with a regular file
-Every invocation is appended to FAKE_LOG as JSON (argv, cwd and CODEX_HOME).
+  exec_error          the message of the turn.failed event (default "not logged in")
+  answer              the final message as JSON, instead of the probe answer
+  launch_agent        `exec` starts a spawn_agent call, then waits 30 seconds
+  sleep               seconds `exec` waits before answering
+Every invocation is appended to FAKE_LOG as JSON (argv, cwd, CODEX_HOME and the
+prompt read from stdin).
 """
 
 from __future__ import annotations
@@ -20,6 +25,7 @@ from __future__ import annotations
 import json
 import os
 import sys
+import time
 from pathlib import Path
 
 
@@ -52,8 +58,15 @@ def prompt_view(scenario: dict) -> list:
 def main() -> int:
     scenario = json.loads(Path(os.environ["FAKE_SCENARIO"]).read_text())
     args = sys.argv[1:]
+    stdin = sys.stdin.read() if args[-1:] == ["-"] else ""
     with open(os.environ["FAKE_LOG"], "a") as log:
-        entry = {"tool": "codex", "argv": args, "cwd": os.getcwd(), "codex_home": os.environ.get("CODEX_HOME")}
+        entry = {
+            "tool": "codex",
+            "argv": args,
+            "cwd": os.getcwd(),
+            "codex_home": os.environ.get("CODEX_HOME"),
+            "stdin": stdin,
+        }
         log.write(json.dumps(entry) + "\n")
 
     if args == ["--version"]:
@@ -72,14 +85,21 @@ def main() -> int:
         auth.write_text("{\"refreshed\": true}")
     thread_id = "0199aaaa-0000-7000-8000-00000000c0de"
     print(json.dumps({"type": "thread.started", "thread_id": thread_id}))
-    print(json.dumps({"type": "turn.started"}))
+    print(json.dumps({"type": "turn.started"}), flush=True)
     if scenario.get("exec_fail") or (scenario.get("fail_with_codex_home") and "CODEX_HOME" in os.environ):
-        print(json.dumps({"type": "turn.failed", "error": {"message": "not logged in"}}))
+        message = scenario.get("exec_error", "not logged in")
+        print(json.dumps({"type": "turn.failed", "error": {"message": message}}))
         return 1
+    if scenario.get("launch_agent"):
+        item = {"id": "item_1", "type": "collab_tool_call", "tool": "spawn_agent"}
+        print(json.dumps({"type": "item.started", "item": item}), flush=True)
+        time.sleep(30)
+    time.sleep(scenario.get("sleep", 0))
     tools = ["shell", "apply_patch"]
     if scenario.get("agent_tool"):
         tools.append("spawn_agent")
     answer = {"canary": canary() if scenario.get("leak_instructions") else "", "tools": tools}
+    answer = scenario.get("answer", answer)
     text = json.dumps(answer) if scenario.get("structured", True) else "canary: none"
     item = {"id": "item_0", "type": "agent_message", "text": text}
     print(json.dumps({"type": "item.completed", "item": item}))

@@ -347,13 +347,6 @@ def part_tokens(entries: Sequence[ReadEntry]) -> int:
     return estimate_tokens(render_part(entries))
 
 
-def reader_part_tokens(cfg: dict, prompt_tokens: int) -> int:
-    """Tokens left for entries in one reader call: the smallest context in the
-    reader's fallback list (5.2), less the prompt and room for the output."""
-    smallest = min(b["context_tokens"] for b in config.role_backends(cfg, "reader"))
-    return smallest - prompt_tokens
-
-
 def _cut(entry: ReadEntry, limit: int) -> ReadEntry:
     """The entry with the longest text prefix that fits `limit` bytes, marked."""
     total = len(entry.text)

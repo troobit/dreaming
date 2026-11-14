@@ -1,0 +1,101 @@
+# Lenses: what dreams look for (7.1, 7.2). Each lens states what to look for,
+# which kinds of proposal it may lead to (knowledge, learning, change) and,
+# optionally, the domains, projects or workflows it applies to. Raise a lens's
+# version whenever its text changes, so sessions are read again under it.
+
+[[lens]]
+id = "preferences"
+version = 1
+look_for = """Explicit preferences and corrections: the user saying how they want \
+something done, rejecting or undoing an approach, or correcting the assistant. \
+Quote the user's own words."""
+may_propose = ["knowledge", "change"]
+
+[[lens]]
+id = "successful-approaches"
+version = 1
+look_for = """Approaches associated with successful outcomes: what was done before \
+the user confirmed it worked or a test, build or lint run passed. Record the \
+outcome only from the user or the check, never from the assistant's own claim."""
+may_propose = ["knowledge", "change"]
+
+[[lens]]
+id = "help-requests"
+version = 1
+look_for = """Recurring requests for explanation or help: the user asking what \
+something means, how a concept or tool works, or why something happened. Tool \
+failures and assistant mistakes alone are not a request."""
+may_propose = ["learning", "knowledge"]
+
+[[lens]]
+id = "mcp-tool-use"
+version = 1
+look_for = """MCP server and tool use: which tools were called and for what, calls \
+that failed or were refused, and needs a configured or available tool could \
+have met but none was used."""
+may_propose = ["change", "knowledge"]
+
+[[lens]]
+id = "skill-use"
+version = 1
+look_for = """Skill use: skills invoked then abandoned, skills that misfired or \
+did the wrong thing, and work that matched a skill nobody invoked or that \
+does not exist yet."""
+may_propose = ["change", "knowledge"]
+
+[[lens]]
+id = "xcode-workflows"
+version = 1
+look_for = """Xcode build, run and preview workflows: build and test commands, \
+simulator and preview problems, signing and scheme trouble, and the steps \
+that resolved them."""
+may_propose = ["change", "knowledge", "learning"]
+
+[[lens]]
+id = "stalls"
+version = 1
+look_for = """Points where a coding concept, tool error or build step stalled the \
+user: repeated attempts at the same error, long detours, or the user saying \
+they are stuck or confused."""
+may_propose = ["learning", "change", "knowledge"]
+
+[[lens]]
+id = "repeated-manual-steps"
+version = 1
+look_for = """Manual steps repeated across sessions that a Make target, script or \
+skill could perform: the same command sequence, setup or checklist typed or \
+requested again."""
+may_propose = ["change"]
+
+[[lens]]
+id = "deliverable-corrections"
+version = 1
+look_for = """Deliverables of the same kind (reports, agreements, reviews, \
+runbooks) repeatedly corrected by hand: the user fixing structure, tone, \
+naming or content of a produced document the same way more than once."""
+may_propose = ["change", "knowledge"]
+
+[[lens]]
+id = "context-weight"
+version = 1
+look_for = """Context spent on instructions and tool schemas: long system prompts, \
+skill listings or tool definitions before the first request, and sessions \
+that ran out of context or were compacted early."""
+may_propose = ["change"]
+
+[[lens]]
+id = "broken-references"
+version = 1
+look_for = """Broken or inconsistent references in skills, rules and \
+configuration: a path, command, skill, tool or folder that is named but does \
+not exist, or that two files describe differently."""
+may_propose = ["change"]
+
+[[lens]]
+id = "dream-behaviour"
+version = 1
+look_for = """How dreaming itself behaved, read only from sessions of earlier \
+dreams: calls whose output missed its schema, quotes that did not match, \
+observations or proposals the user later dismissed or reverted, and steps that \
+spent budget without result."""
+may_propose = ["change", "knowledge"]

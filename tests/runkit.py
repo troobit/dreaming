@@ -42,6 +42,8 @@ class FakeModel:
 
     name = "fake"
     context_tokens = 100_000
+    release_date = ""
+    accepts_session_id = False
 
     def __init__(self, clock=None, *, tokens=(100, 20), seconds=0.0, before=None):
         self.clock = clock
@@ -51,7 +53,7 @@ class FakeModel:
         self.answered = 0
         self.prompts = []
 
-    def call(self, role, prompt, schema, tools):
+    def call(self, role, prompt, schema, tools, session_id=None):
         if self.before:
             self.before(role, prompt)
         self.prompts.append((role, prompt))
