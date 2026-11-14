@@ -70,6 +70,20 @@ Update duty: none; revisit this table only when the user asks.
 
 ### Prior art beyond OpenClaw
 
+Foundation contract reuse (2026-11-14): the apsis shared-json v1 JSON Schema and
+synthetic contract fixtures are vendored from `ArjenSchwarz/orbit` revision
+`686ba0917a0eabefd271a3a2035ce52d36a2f266` (MIT, © 2025 Arjen Schwarz). The licence
+is retained as `src/dreaming/APSIS-LICENSE.txt`. Only the schema is used at runtime;
+the fixture boundary is tests. Session reading remains an apsis subprocess, with
+no orbit import. Update schema and fixtures together when the contract changes;
+accept additive fields and unknown blocks within v1 and reject other versions.
+Some Codex source documents omit `thread_id` even when they have a session id;
+the client preserves that absence rather than inventing source metadata.
+The apsis executable's Go flag parser stops at the first positional argument;
+the client places `-s` and `-f` before the session id, even though help examples
+show them after it. Exec-stream visibility uses the listing's full identifier,
+since a thread id alone is not an apsis stream identifier.
+
 Sources checked 2026-11-14 (papers by their abstract pages; products by their documentation). The design follows what recurs across them and drops what they report as harmful.
 
 | Source | Finding used | Where it lands |
@@ -93,14 +107,21 @@ Not adopted: embeddings and graph stores (Mem0, Zep/Graphiti, A-MEM, HippoRAG), 
 
 ```python
 class Backend(Protocol):
-    name: str; context_tokens: int; supports_tools: bool
-    def probe(self) -> ProbeResult: ...          # version, tools, isolation (5.5)
+    name: str
+    context_tokens: int
+    supports_tools: bool
+
+    def probe(self) -> ProbeResult: ...  # version, tools, isolation (5.5)
     def call(self, role: str, prompt: str, schema: dict, tools: list[str]) -> CallResult: ...
+
 
 @dataclass
 class CallResult:
-    output: dict; tokens_in: int; tokens_out: int; usage_estimated: bool
-    session_ref: str          # harness session id, or LM Studio thread id == run id (5.8)
+    output: dict
+    tokens_in: int
+    tokens_out: int
+    usage_estimated: bool
+    session_ref: str  # harness session id, or LM Studio thread id == run id (5.8)
 ```
 
 - One retry policy for every call: on transport failure or schema-invalid output, retry once on the same backend. Two transport failures mark the backend unavailable for the run and the call moves to the role's next backend (which gets its own single retry; not nested). Two schema failures mark the input failed (4.7) with no backend change, except that `breaker_k` consecutive schema failures on one backend mark that backend unavailable for the run, and inputs that failed on it stay eligible for the next backend. A harness usage-limit error is handled separately (below). Every call has a timeout and is killed as a process group.
@@ -253,6 +274,7 @@ Exit codes follow screw except for budget exhaustion: 0 success (including `budg
 
 ## Risks and Assumptions
 
+- Foundation portability (2026-11-14): implementation also runs in Orbit worktrees; it does not require the checkout's branch to be literally `dreaming`. Private data requires a local POSIX filesystem and Git on PATH; resolved paths are checked for ordinary, worktree and bare repositories before writing. Configuration paths resolve relative to the configuration file. An instruction repository and its default branch may be configured explicitly; otherwise the local remote HEAD or `main`/`master` identifies that branch, without fetching. Snapshots pin that branch to one commit before reading any file. The private names file is validated and read separately, never embedded in snapshots. Live probes require an explicit opt-in and available login/model; normal tests use fake executables and recorded apsis documents. A probe reports unverified capabilities as unavailable rather than inferring isolation from a successful call. The Foundation `make install` installs a standalone wheel through uv; the version-pinned launcher is added by task 10.
 - Risk: harness isolation holds per version | Verify: first implementation task probes each backend and version — `codex debug prompt-input` for Codex, a real exec session for its tool list (the prompt view may ignore feature flags, and `spawn_agent` stayed listed under every flag tried), `claude --safe-mode` with `--mcp-config` and the parent-directory instruction walk from `DREAMING_HOME` for Claude — and confirms apsis finds the call's session | If wrong: the backend is skipped for roles needing isolation (5.5), or for Codex the adapter enforces by killing the call on an agent-launch event; the probe result names the leak.
 - Risk: each harness's structured-output option differs by version | Verify: same probe task | If wrong: take the final message as JSON and rely on program validation alone.
 - Risk: a local model produces schema-valid, quote-accurate reader output | Verify: run the reader on ten recorded sessions in a dry trial before enabling it as the default backend | If wrong: configure a cloud backend first in the reader's fallback list.

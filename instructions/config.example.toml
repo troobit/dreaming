@@ -1,0 +1,51 @@
+# Copy to ~/.dreaming/config.toml (or DREAMING_HOME/config.toml).
+auto_apply = true
+
+[instructions]
+repository = "/absolute/path/to/dreaming"
+default_branch = "main"
+
+[budget]
+max_sessions = 100
+max_seconds = 3600
+max_tokens = 200000
+reserve_share = 0.25
+
+[thresholds]
+min_sessions = 3
+max_usage_wait = 43200
+fallback_on_usage_limit = false
+
+[backends.claude]
+harness = "claude"
+command = "claude"
+context_tokens = 200000
+
+[backends.codex]
+harness = "codex"
+command = "codex"
+context_tokens = 262144
+
+[roles]
+reader = ["claude", "codex"]
+reviewer = ["claude", "codex"]
+researcher = ["claude", "codex"]
+author = ["claude", "codex"]
+replayer = ["claude", "codex"]
+
+[origins]
+non_interactive_sources = ["codex-exec", "lmstudio"]
+non_interactive = ["automation-*"]
+interactive = ["terminal"]
+
+[[classification.rules]]
+provider = "lmstudio"
+local = true
+
+[[classification.rules]]
+provider = "openai"
+local = false
+
+[scan]
+# names_file = "/private/path/outside/all/git/repositories/names.txt"
+quote_chars = 80
