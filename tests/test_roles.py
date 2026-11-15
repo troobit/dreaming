@@ -169,12 +169,14 @@ GOOD = {
         {
             "verification": {"supported": False, "reason": "file changed"},
             "outcome": "defer",
+            "deferred_steps": [],
             "changes": [],
             "learning": [],
         },
         {
             "verification": {"supported": True, "reason": "evidence still applies"},
             "outcome": "change",
+            "deferred_steps": [],
             "changes": [
                 {
                     "repo": "agentic-coding",
@@ -200,6 +202,7 @@ GOOD = {
         {
             "verification": {"supported": True, "reason": "ok"},
             "outcome": "learning",
+            "deferred_steps": [],
             "changes": [],
             "learning": [
                 {

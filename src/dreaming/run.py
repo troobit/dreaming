@@ -123,9 +123,12 @@ def create_run(
 
 
 def find_run(conn: sqlite3.Connection, run_id: str | None = None) -> sqlite3.Row:
-    """The named run, or the latest one."""
+    """The named run, or this store's latest one (an imported run is lineage
+    from another store, 14.3)."""
     if run_id is None:
-        row = conn.execute("SELECT * FROM runs ORDER BY started_at DESC LIMIT 1")
+        row = conn.execute(
+            "SELECT * FROM runs WHERE imported = 0 ORDER BY started_at DESC LIMIT 1"
+        )
     else:
         row = conn.execute("SELECT * FROM runs WHERE id = ?", (run_id,))
     found = row.fetchone()

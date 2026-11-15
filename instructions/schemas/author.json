@@ -207,13 +207,40 @@
         "additionalProperties": false
       },
       "description": "Empty unless outcome is learning; then exactly one recommendation."
+    },
+    "deferred_steps": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "skill": {
+            "type": "string"
+          },
+          "step": {
+            "type": "string",
+            "description": "The step the change needs."
+          },
+          "reason": {
+            "type": "string",
+            "description": "Why the skill cannot run unattended."
+          }
+        },
+        "required": [
+          "skill",
+          "step",
+          "reason"
+        ],
+        "additionalProperties": false
+      },
+      "description": "Steps needing a skill that asks for input; they are deferred and reported."
     }
   },
   "required": [
     "verification",
     "outcome",
     "changes",
-    "learning"
+    "learning",
+    "deferred_steps"
   ],
   "additionalProperties": false
 }

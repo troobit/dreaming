@@ -21,12 +21,14 @@ from datetime import date
 
 from dreaming import budget, config, knowledge, roles, sessions, steps
 from dreaming.errors import Rejected
-from dreaming.observe import call_input_ref, normalise_key, run_request
+from dreaming.observe import evidence_input_ref, normalise_key, run_request
 from dreaming.run import Context, Outcome
 from dreaming.steps import NewStep, Step
 
 # Evidence shown per summary: one per session first, newest first.
 SUMMARY_EVIDENCE = 10
+# Feedback shown per item awaiting reassessment, the latest.
+FEEDBACK_SHOWN = 5
 # A change on a dream branch that has not been merged (9.14).
 UNMERGED = ("proposed", "waiting")
 NO_CHANGE = ("failed", "withheld")
@@ -97,11 +99,33 @@ def summary_evidence(rows: Sequence[Mapping], quote_chars: int) -> tuple:
 # What the reviewer sees
 
 
+def _feedback(conn: sqlite3.Connection) -> dict[str, list[dict]]:
+    """Feedback from consuming tools on each item's revisions, oldest first
+    (14.5)."""
+    found: dict[str, list[dict]] = {}
+    for row in conn.execute("SELECT * FROM feedback ORDER BY received_at, id"):
+        for cited in json.loads(row["revisions"]):
+            found.setdefault(cited["item_id"], []).append(
+                {
+                    "id": row["id"],
+                    "version": cited["version"],
+                    "use": cited["use"],
+                    "outcome": row["outcome"],
+                    "basis": row["basis"],
+                    "check": row["check_name"],
+                    "received_at": row["received_at"],
+                }
+            )
+    return found
+
+
 def _items(conn: sqlite3.Connection, cfg: dict, today: date) -> dict[str, list[dict]]:
     """Items resting on each pattern, as the reviewer sees them; superseded items
     are left out. `revalidate` marks an active item whose latest support is older
-    than `revalidate_after_days` (11.7)."""
+    than `revalidate_after_days`, and an item pending reassessment shows its
+    latest feedback (11.7)."""
     limit = cfg["thresholds"]["revalidate_after_days"]
+    feedback = _feedback(conn)
     found: dict[str, list[dict]] = {}
     rows = conn.execute(
         "SELECT r.*, k.pattern_id, k.pending_reassessment FROM knowledge_items k"
@@ -122,6 +146,11 @@ def _items(conn: sqlite3.Connection, cfg: dict, today: date) -> dict[str, list[d
                 "confidence": row["confidence"],
                 "pending_reassessment": bool(row["pending_reassessment"]),
                 "revalidate": row["status"] == "active" and stale,
+                "feedback": (
+                    feedback.get(row["item_id"], [])[-FEEDBACK_SHOWN:]
+                    if row["pending_reassessment"]
+                    else []
+                ),
             }
         )
     return found
@@ -161,7 +190,7 @@ def unreviewed_dreams(conn: sqlite3.Connection, pattern: Mapping, run_id: str) -
     since = pattern["last_reviewed_run"] or pattern["created_run"]
     return conn.execute(
         "SELECT COUNT(*) FROM runs WHERE kind = 'dream' AND status != 'discarded'"
-        " AND id != :run AND started_at > COALESCE("
+        " AND imported = 0 AND id != :run AND started_at > COALESCE("
         "(SELECT started_at FROM runs WHERE id = :since), '')",
         {"run": run_id, "since": since},
     ).fetchone()[0]
@@ -172,7 +201,7 @@ def run_records(conn: sqlite3.Connection, run_id: str) -> list[dict]:
     (7.5), holding no session's text or identifiers."""
     records = []
     rows = conn.execute(
-        "SELECT * FROM runs WHERE id != ? AND status != 'discarded'"
+        "SELECT * FROM runs WHERE id != ? AND status != 'discarded' AND imported = 0"
         " ORDER BY started_at DESC, id DESC",
         (run_id,),
     )
@@ -386,12 +415,7 @@ def _input_ref(conn: sqlite3.Connection, data: Mapping) -> str:
         for summary in data[group]
         for evidence in summary["evidence"]
     ]
-    rows = conn.execute(
-        "SELECT DISTINCT source, session_id AS id FROM observations"
-        " WHERE evidence_id IN (SELECT value FROM json_each(?))",
-        (json.dumps(shown),),
-    )
-    return call_input_ref([dict(row) for row in rows])
+    return evidence_input_ref(conn, shown)
 
 
 class _Applier:

@@ -248,6 +248,17 @@ def call_input_ref(copies: Sequence[Mapping]) -> str:
     return json.dumps({"sessions": [list(pair) for pair in found]})
 
 
+def evidence_input_ref(conn: sqlite3.Connection, evidence_ids: Sequence[str]) -> str:
+    """A call's `input_ref` when its input holds evidence: the sessions those
+    observations came from (2.11)."""
+    rows = conn.execute(
+        "SELECT DISTINCT source, session_id AS id FROM observations"
+        " WHERE evidence_id IN (SELECT value FROM json_each(?))",
+        (json.dumps(list(evidence_ids)),),
+    )
+    return call_input_ref([dict(row) for row in rows])
+
+
 def _forgotten(conn: sqlite3.Connection, copies: Sequence[Mapping]) -> bool:
     """Whether any copy of the session is forgotten now (2.11)."""
     for copy in copies:

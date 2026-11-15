@@ -131,6 +131,13 @@ def input_tokens(cfg: dict, role: str, fixed: str) -> int:
     return room
 
 
+def fits(cfg: dict, role: str, prompt: str) -> bool:
+    """Whether a whole prompt fits the smallest context in the role's fallback
+    list with the reply's share kept free (5.2)."""
+    context = config.role_context_tokens(cfg, role)
+    return estimate_tokens(prompt) <= context - int(context * OUTPUT_SHARE)
+
+
 def _pack(items: Sequence[dict], room: int) -> tuple[list[dict], int]:
     """The leading items whose JSON fits in `room` bytes, and the bytes used. The
     first item that does not fit ends the list, so the caller's order holds."""

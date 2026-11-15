@@ -41,13 +41,17 @@ CONFIDENCE = ("low", "medium", "high")
 
 # Observations neither dismissed as evidence nor from a forgotten session, each
 # with the interaction it belongs to: one interaction counts once, whichever
-# source copies it was read through (13.6).
-COUNTED_OBSERVATIONS = """
+# source copies it was read through (13.6). Retrieval shows these as evidence
+# references (14.2).
+SHOWN_OBSERVATIONS = """
 SELECT o.*, COALESCE(s.thread_id, o.source || ':' || o.session_id) AS interaction
 FROM observations o
 LEFT JOIN sessions_seen s ON s.source = o.source AND s.session_id = o.session_id
 WHERE o.excluded = 0 AND COALESCE(s.forgotten, 0) = 0
 """
+# Those that count as support: imported evidence never counts toward this
+# store's promotion thresholds (14.3).
+COUNTED_OBSERVATIONS = SHOWN_OBSERVATIONS + "AND o.imported = 0\n"
 
 
 def counted_observations(conn: sqlite3.Connection) -> list[sqlite3.Row]:
@@ -139,8 +143,8 @@ def evidence_support(
         {"user": USER_STATEMENT, "ids": ids, "user_only": int(user_only)},
     ).fetchone()
     files = conn.execute(
-        "SELECT COUNT(*) FROM file_findings"
-        " WHERE evidence_id IN (SELECT value FROM json_each(?))",
+        "SELECT COUNT(*) FROM file_findings WHERE imported = 0"
+        " AND evidence_id IN (SELECT value FROM json_each(?))",
         (ids,),
     ).fetchone()[0]
     return Support(row["sessions"], row["statements"], row["successes"], files)
@@ -192,17 +196,35 @@ def _not_found(what: str, identifier: str) -> DreamingError:
     return DreamingError(f"unknown {what} {identifier}", USAGE_ERROR, "not_found")
 
 
-def item_withheld(conn: sqlite3.Connection, item_id: str, cfg: dict) -> bool:
-    """Whether default retrieval and adoption hold the item back: the counted
-    part of its supporting evidence fails 4.5 or 13.3. Forgetting a session
-    withholds what it alone held up at once, and restoring it releases it (2.11).
-    """
-    row = current(conn, item_id)
-    if row is None:
-        raise _not_found("knowledge item", item_id)
+def corrected_by_user(conn: sqlite3.Connection, item_id: str) -> bool:
+    """Whether the user corrected the item directly (13.5); the correction is
+    the user's own word, which applies at once and which inferred evidence
+    never overrides (13.3, 13.4)."""
+    row = conn.execute(
+        "SELECT 1 FROM knowledge_revisions WHERE item_id = ? AND actor = 'user'",
+        (item_id,),
+    ).fetchone()
+    return row is not None
+
+
+def revision_withheld(conn: sqlite3.Connection, row: Mapping, cfg: dict) -> bool:
+    """Whether default retrieval and adoption hold a revision back: the counted
+    part of its supporting evidence fails 4.5 or 13.3 and the user has not
+    corrected the item. Forgetting a session withholds what it alone held up at
+    once, and restoring it releases it (2.11)."""
+    if corrected_by_user(conn, row["item_id"]):
+        return False
     supporting, _ = split_evidence(conn, row["kind"], json.loads(row["supporting"]))
     support = item_support(conn, row["kind"], supporting)
     return not support_holds(support, cfg, row["kind"])
+
+
+def item_withheld(conn: sqlite3.Connection, item_id: str, cfg: dict) -> bool:
+    """`revision_withheld` for an item's current revision."""
+    row = current(conn, item_id)
+    if row is None:
+        raise _not_found("knowledge item", item_id)
+    return revision_withheld(conn, row, cfg)
 
 
 def change_withheld(conn: sqlite3.Connection, change_id: str, cfg: dict) -> bool:
@@ -228,6 +250,12 @@ def affected_items(
             (source, session_id),
         )
         evidence.update(row[0] for row in rows)
+    return items_citing(conn, evidence)
+
+
+def items_citing(conn: sqlite3.Connection, evidence: Iterable[str]) -> list[str]:
+    """Knowledge items whose current revision cites any of this evidence."""
+    evidence = set(evidence)
     if not evidence:
         return []
     rows = conn.execute(
@@ -339,6 +367,84 @@ def current(conn: sqlite3.Connection, item_id: str) -> sqlite3.Row | None:
     ).fetchone()
 
 
+# A run's revisions are retained once it has ended; until then they are a running
+# dream's proposals (14.2). Revisions from feedback or an import have no run of
+# this store's and are retained at once.
+RETAINED_RUNS = ("complete", "partial", "budget_exhausted")
+
+
+def retained(
+    conn: sqlite3.Connection, item_id: str | None = None
+) -> dict[str, sqlite3.Row]:
+    """Each item's latest retained revision, with the item's own fields; with
+    `item_id`, that item's only."""
+    rows = conn.execute(
+        "SELECT r.*, k.pattern_id, k.pending_reassessment, k.imported"
+        " FROM knowledge_revisions r JOIN knowledge_items k ON k.id = r.item_id"
+        " LEFT JOIN runs u ON u.id = r.originating_run"
+        f" WHERE (r.originating_run IS NULL OR u.status IN {RETAINED_RUNS})"
+        " AND (:item IS NULL OR r.item_id = :item)"
+        " ORDER BY r.item_id, r.version",
+        {"item": item_id},
+    )
+    return {row["item_id"]: row for row in rows}
+
+
+def evidence_refs(
+    conn: sqlite3.Connection,
+    ids: Iterable[str],
+    quote_chars: int,
+    *,
+    counted: bool = False,
+) -> list[dict]:
+    """Evidence by id as shown outside the store, never as transcript: an
+    observation's redacted quote cut to `quote_chars`, with its modality so a
+    hedge reads as a hedge, or a file finding with where it was found; each with
+    its source's availability (13.7). Evidence dismissed by feedback or from a
+    forgotten session is never shown (2.11, 13.5); with `counted`, imported
+    evidence is left out too."""
+    ids = json.dumps(sorted(set(ids)))
+    query = COUNTED_OBSERVATIONS if counted else SHOWN_OBSERVATIONS
+    refs = []
+    for row in conn.execute(
+        f"SELECT * FROM ({query})"
+        " WHERE evidence_id IN (SELECT value FROM json_each(?))",
+        (ids,),
+    ):
+        quote = row["quote"]
+        if len(quote) > quote_chars:
+            quote = quote[:quote_chars] + "…"
+        refs.append(
+            {
+                "id": row["evidence_id"],
+                "quote": quote,
+                "kind": row["kind"],
+                "modality": row["modality"],
+                "outcome": row["outcome"],
+                "date": row["observed_on"],
+                "project": row["project"],
+                "availability": row["availability"],
+            }
+        )
+    for row in conn.execute(
+        "SELECT * FROM file_findings WHERE (:all OR imported = 0)"
+        " AND evidence_id IN (SELECT value FROM json_each(:ids))",
+        {"all": int(not counted), "ids": ids},
+    ):
+        refs.append(
+            {
+                "id": row["evidence_id"],
+                "repo": row["repo"],
+                "revision": row["revision"],
+                "path": row["path"],
+                "location": row["location"],
+                "finding": row["finding"],
+                "availability": row["availability"],
+            }
+        )
+    return sorted(refs, key=lambda ref: ref["id"])
+
+
 def same_text(text: str) -> str:
     """Item content as compared for equivalence (13.9)."""
     return " ".join(text.lower().split()).rstrip(" .")
@@ -432,12 +538,17 @@ def stated(raw: Mapping | None) -> bool:
 
 
 def resolve_scope(
-    conn: sqlite3.Connection, raw: Mapping | None, supporting: Sequence[str]
+    conn: sqlite3.Connection,
+    raw: Mapping | None,
+    supporting: Sequence[str],
+    *,
+    by_user: bool = False,
 ) -> dict:
     """The scope to store: the stated one, checked, or the evidence's own domains
     and projects when none is stated; unresolved when those are unknown. A
     global scope needs evidence from more than one domain or the user's own
-    statement, so recurrence in one scope never makes an item global (13.4)."""
+    statement or correction (`by_user`), so recurrence in one scope never makes
+    an item global (13.4)."""
     scope = {key: sorted(set((raw or {}).get(key) or [])) for key in SCOPE_LISTS}
     scope["global"] = bool((raw or {}).get("global"))
     scope["unresolved"] = bool((raw or {}).get("unresolved"))
@@ -447,7 +558,8 @@ def resolve_scope(
         if any(scope[key] for key in SCOPE_LISTS):
             raise Rejected("a global scope names no domains, projects or workflows")
         domains = _context(conn, supporting)["domains"]
-        if len(domains) < 2 and not evidence_support(conn, supporting).user_statements:
+        stated_by_user = by_user or evidence_support(conn, supporting).user_statements
+        if len(domains) < 2 and not stated_by_user:
             raise Rejected(
                 "a global scope needs evidence from more than one domain or the "
                 "user's own statement (13.4)"
@@ -497,20 +609,25 @@ def retrieval_key(item: Mapping) -> tuple:
 # Applying operations (13.2-13.9, design Review and knowledge)
 
 
-def check_evidence(conn: sqlite3.Connection, ids: Iterable[str]) -> None:
-    """Every id must name counted evidence: an observation neither dismissed nor
+def counted_ids(conn: sqlite3.Connection, ids: Iterable[str]) -> set[str]:
+    """The ids that name counted evidence: an observation neither dismissed nor
     from a forgotten session, or a file finding."""
-    ids = sorted(set(ids))
-    found = {
+    return {
         row[0]
         for row in conn.execute(
             f"SELECT evidence_id FROM ({COUNTED_OBSERVATIONS})"
             " WHERE evidence_id IN (SELECT value FROM json_each(:ids))"
-            " UNION SELECT evidence_id FROM file_findings"
-            " WHERE evidence_id IN (SELECT value FROM json_each(:ids))",
-            {"ids": json.dumps(ids)},
+            " UNION SELECT evidence_id FROM file_findings WHERE imported = 0"
+            " AND evidence_id IN (SELECT value FROM json_each(:ids))",
+            {"ids": json.dumps(sorted(set(ids)))},
         )
     }
+
+
+def check_evidence(conn: sqlite3.Connection, ids: Iterable[str]) -> None:
+    """Every id must name counted evidence (`counted_ids`)."""
+    ids = sorted(set(ids))
+    found = counted_ids(conn, ids)
     missing = [i for i in ids if i not in found]
     if missing:
         raise Rejected(
@@ -528,6 +645,11 @@ class Reviser:
     actor, base version and originating run or feedback, and records the
     conclusion of any pending reassessment (2.10, 11.7). A stale base version is
     refused and the item queued for the next review.
+
+    With the `user` actor the operation is the user's own correction through
+    feedback (13.5): it applies at once with the stated confidence, makes the
+    item active unless it dismisses it, may give it a global scope, and settles
+    the item against inferred evidence from then on (13.3, 13.4).
     """
 
     def __init__(
@@ -596,12 +718,12 @@ class Reviser:
         return row
 
     def user_settled(self, row: Mapping) -> bool:
-        """Whether an item rests on the user's own explicit statement, which
-        inferred evidence never overrides (13.4)."""
-        return (
-            evidence_support(self.conn, json.loads(row["supporting"])).user_statements
-            > 0
-        )
+        """Whether an item rests on the user's own explicit statement or
+        correction, which inferred evidence never overrides (13.4)."""
+        statements = evidence_support(
+            self.conn, json.loads(row["supporting"])
+        ).user_statements
+        return statements > 0 or corrected_by_user(self.conn, row["item_id"])
 
     def _cap(self, row: Mapping) -> None:
         """A run may supersede or dismiss at most `max_revision_fraction` of the
@@ -750,6 +872,8 @@ class Reviser:
         judgement = judge(self.conn, self.cfg, kind, supporting, contradicting)
         cap = confidence_cap(judgement, self.cfg)
         confidence, basis = op["confidence"], op["confidence_basis"]
+        if self.actor == "user":
+            return judgement, confidence, basis
         if CONFIDENCE.index(confidence) > CONFIDENCE.index(cap):
             s = judgement.support
             basis = (
@@ -777,13 +901,15 @@ class Reviser:
         status: str | None = None,
     ) -> Judgement:
         judgement, confidence, basis = self._judged(op, kind, supporting, contradicting)
+        if status is None:
+            status = "active" if self.actor == "user" else judgement.status
         self._write(
             item_id,
             version=version,
             base_version=base_version,
             kind=kind,
             content=content,
-            status=status or judgement.status,
+            status=status,
             scope=scope,
             confidence=confidence,
             basis=basis,
@@ -868,7 +994,12 @@ class Reviser:
         row = self._existing(op)
         scope = None
         if stated(op["scope"]):
-            scope = resolve_scope(self.conn, op["scope"], op["supporting"])
+            scope = resolve_scope(
+                self.conn,
+                op["scope"],
+                op["supporting"],
+                by_user=self.actor == "user",
+            )
         return self._next(
             row, op, reason=op["reason"], content=op["content"].strip(), scope=scope
         )
@@ -928,7 +1059,8 @@ class Reviser:
         cited = [*op["supporting"], *op["contradicting"]]
         self._evidence(cited)
         if (
-            self.user_settled(row)
+            self.actor != "user"
+            and self.user_settled(row)
             and not evidence_support(self.conn, cited).user_statements
         ):
             raise Rejected(

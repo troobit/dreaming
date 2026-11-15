@@ -237,6 +237,53 @@ def test_the_reviewer_call_names_the_sessions_its_input_held(db, cfg):
     assert json.loads(ref[0]) == {"sessions": [["claude", "n-s0"], ["claude", "n-s1"]]}
 
 
+def test_the_reviewer_sees_feedback_on_items_awaiting_reassessment(db, cfg):
+    pattern(db, "p-uv", "prefers uv")
+    ids = spread(db, "u", "prefers uv", 3, pattern_id="p-uv")
+    for item_id, pending in (("k-uv", 1), ("k-quiet", 0)):
+        db.execute(
+            "INSERT INTO knowledge_items (id, kind, status, pattern_id,"
+            " pending_reassessment, created_at, updated_at)"
+            " VALUES (?, 'preference', 'active', 'p-uv', ?, '', '')",
+            (item_id, pending),
+        )
+        db.execute(
+            "INSERT INTO knowledge_revisions (item_id, version, content, kind,"
+            " status, confidence, supporting, actor, created_at)"
+            " VALUES (?, 1, 'prefers uv', 'preference', 'active', 'medium', ?,"
+            " 'dream', '')",
+            (item_id, json.dumps(ids)),
+        )
+    db.execute(
+        "INSERT INTO feedback (id, revisions, outcome, basis, received_at)"
+        " VALUES ('fb-1', ?, 'success', 'unknown', '2026-11-14T10:00:00+00:00')",
+        (
+            json.dumps(
+                [
+                    {"item_id": "k-uv", "version": 1, "use": "present_only"},
+                    {"item_id": "k-quiet", "version": 1, "use": "cited"},
+                ]
+            ),
+        ),
+    )
+    model = reviewer({})
+    run_review(db, cfg, model)
+    (data,) = model.of("reviewer")
+    shown = {item["id"]: item for item in data["patterns"][0]["knowledge"]}
+    assert shown["k-uv"]["feedback"] == [
+        {
+            "id": "fb-1",
+            "version": 1,
+            "use": "present_only",
+            "outcome": "success",
+            "basis": "unknown",
+            "check": None,
+            "received_at": "2026-11-14T10:00:00+00:00",
+        }
+    ]
+    assert shown["k-quiet"]["feedback"] == []
+
+
 # Patterns (6.5, 11.4)
 
 

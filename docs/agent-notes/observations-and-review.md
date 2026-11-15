@@ -22,7 +22,9 @@ Tasks 15–19 of `specs/dreaming/tasks.md`: `redact.py`, `observe.py` (gate, Rea
 - `Reviser` applies reviewer operations (and later feedback, task 21) inside the caller's transaction. It never trusts the model's status: it recomputes it, caps confidence (`confidence_cap`), accumulates evidence across revisions and writes an append-only revision with actor, base version, run, backend, model, lens and latest support date.
 - A stale `base_version` or the revision cap marks the item `pending_reassessment` before raising `Rejected`; the step's transaction still commits, so the mark persists.
 - "User-settled" means the current revision cites a counted asserted `user_statement`; contest, dismiss and supersede of such an item need a user statement too, and supersede always does.
-- `scope_applies` and `retrieval_key` are the scope matching and ordering the knowledge operations (task 21) should use; neither is called by production code yet.
+- `scope_applies` and `retrieval_key` are the scope matching and ordering of retrieval (`api.py`, see `knowledge-api.md`).
+- `COUNTED_OBSERVATIONS` leaves out imported evidence; `SHOWN_OBSERVATIONS` keeps it, for evidence references in retrieval.
+- The `user` actor (feedback corrections) skips the confidence and revision caps, forces `active` unless dismissing, and makes the item user-settled (`corrected_by_user`).
 - Ids for created records are `new_id(prefix, run, seed…)` hashes, so re-applying a stored answer after a crash creates the same rows.
 
 ## Review step (`review.py`)
@@ -37,7 +39,7 @@ Tasks 15–19 of `specs/dreaming/tasks.md`: `redact.py`, `observe.py` (gate, Rea
 
 ## Not yet done here
 
-- Feedback shown to the reviewer for items pending after feedback (11.7) waits for the feedback operation (task 21).
+- Items pending reassessment show their latest feedback to the reviewer (`review._feedback`, 11.7).
 - Before/after counts on earlier changes (11.1) and re-candidacy after an applied change (11.2) belong to task 27; until then a pattern with an applied change is refused as a candidate (Q104).
 - Selection warnings, unmapped domains and origins are not stored for the report; task 29 needs to capture them from the planner's `Selection`.
 

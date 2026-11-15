@@ -34,7 +34,7 @@ Tasks 11–14 of `specs/dreaming/tasks.md`: `backends/__init__.py` (dispatcher),
 - `reviewer_input` packs `PatternSummary` dicts: new clusters up to `new_cluster_share` of the room, then existing patterns in the caller's (ranked) order, then run records; the first item that does not fit stops each list, and leftovers are counted (`omitted`, patterns per lens). Evidence reaches the reviewer only through `Evidence.from_row`, which keeps the id and the stored redacted quote cut to `quote_chars`.
 - Readers, reviewers and replayers must have empty tool lists (config check, Q94).
 - `reader_lenses`: sessions with `subject = dreaming` get only the `dream-behaviour` lens; user sessions get every other lens that applies (Q95).
-- Not built yet: the replay judge (a reviewer-role call with its own prompt and schema, task 25) and the researcher and author input builders (task 20).
+- Not built yet: the replay judge (a reviewer-role call with its own prompt and schema, task 25). The researcher and author inputs are built in `research.py` and `author.py` (see `research-and-authoring.md`); `roles.fits` checks a whole prompt against the smallest context.
 
 ## Prompt sizes (shipped instruction set)
 

@@ -10,6 +10,7 @@ from pathlib import Path
 
 from dreaming import (
     __version__,
+    api,
     budget,
     config,
     observe,
@@ -282,6 +283,10 @@ def _trial(args: argparse.Namespace) -> int:
     return 0
 
 
+def _api(args: argparse.Namespace) -> int:
+    return api.main(sys.stdin, sys.stdout)
+
+
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="dream",
@@ -381,6 +386,13 @@ def _parser() -> argparse.ArgumentParser:
     )
     reader.add_argument("--json", action="store_true", help="print JSON")
     reader.set_defaults(handler=_trial, reread=False, repo=None, workflow=None)
+
+    machine = commands.add_parser(
+        "api",
+        help='answer one JSON request on stdin, {"dreaming_api": 1, "op": ...}, '
+        "with one JSON response on stdout",
+    )
+    machine.set_defaults(handler=_api)
     return parser
 
 

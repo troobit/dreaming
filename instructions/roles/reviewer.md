@@ -38,6 +38,13 @@ Each piece of evidence has an `id`, a short `quote`, its `kind`, `modality`,
   - `dismiss` an item its evidence no longer supports.
   - `confirm` an active item that is still supported, when asked to
     re-validate it.
+  An item with `pending_reassessment` needs one of these operations. Its
+  `feedback` lists what tools reported after using it: `cited` revisions were
+  relied on, `present_only` ones were only in the prompt, so their outcome is
+  association, not confirmation. Reassess it against that feedback and the
+  independent evidence, and say in `reason` whether its advice, confidence or
+  status changed and why. Feedback with no outcome is insufficient to assess
+  effect; say so.
   Every operation except `create` names the `item_id` and the `base_version`
   you read.
 - `item_merges`: items that state the same interpretation in the same scope.

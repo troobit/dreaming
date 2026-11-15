@@ -403,7 +403,40 @@ ALTER TABLE patterns ADD COLUMN merged_into TEXT;
 ALTER TABLE learning ADD COLUMN pattern_id TEXT;
 """
 
-MIGRATIONS: list[str] = [_SCHEMA_V1, _SCHEMA_V2, _SCHEMA_V3, _SCHEMA_V4]
+# Research and authoring: findings by question with their assessment, sources the
+# researcher could not read (4.6), interactive skill steps the author deferred
+# (9.3), and an authored change's edits, message, research and base revision.
+_SCHEMA_V5 = """
+ALTER TABLE research_findings ADD COLUMN question_id TEXT;
+ALTER TABLE research_findings ADD COLUMN assessment TEXT;
+ALTER TABLE questions ADD COLUMN unavailable TEXT NOT NULL DEFAULT '[]';
+ALTER TABLE candidates ADD COLUMN deferred_steps TEXT NOT NULL DEFAULT '[]';
+ALTER TABLE changes ADD COLUMN candidate_id TEXT;
+ALTER TABLE changes ADD COLUMN summary TEXT;
+ALTER TABLE changes ADD COLUMN commit_message TEXT;
+ALTER TABLE changes ADD COLUMN edits TEXT NOT NULL DEFAULT '[]';
+ALTER TABLE changes ADD COLUMN research TEXT NOT NULL DEFAULT '[]';
+ALTER TABLE changes ADD COLUMN base_revision TEXT;
+"""
+
+# Exchange (14.3): rows that came from another store's export. Imported evidence
+# never counts toward this store's promotion thresholds, and imported runs are
+# lineage, not this store's dreams.
+_SCHEMA_V6 = """
+ALTER TABLE runs ADD COLUMN imported INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE observations ADD COLUMN imported INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE file_findings ADD COLUMN imported INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE learning ADD COLUMN imported INTEGER NOT NULL DEFAULT 0;
+"""
+
+MIGRATIONS: list[str] = [
+    _SCHEMA_V1,
+    _SCHEMA_V2,
+    _SCHEMA_V3,
+    _SCHEMA_V4,
+    _SCHEMA_V5,
+    _SCHEMA_V6,
+]
 
 
 def statements(script: str) -> list[str]:
