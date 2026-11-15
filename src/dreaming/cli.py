@@ -12,11 +12,49 @@ from dreaming.sessions import SessionError
 from dreaming.store import StoreError
 
 
+def _api_main(config_path):
+    from dreaming.api import handle_request
+    from dreaming.store import MigrationBlocked, Store
+
+    request = None
+    try:
+        request = json.load(sys.stdin)
+        if (
+            not isinstance(request, dict)
+            or type(request.get("dreaming_api")) is not int
+            or request["dreaming_api"] != 1
+        ):
+            result = handle_request(None, None, request)
+        else:
+            config = load_config(config_path)
+            writable = request.get("op") in ("knowledge.feedback", "knowledge.import")
+            with Store(home_path()) if writable else Store.readonly(home_path()) as store:
+                result = handle_request(store, config, request)
+    except (ValueError, StoreError, sqlite3.Error, OSError) as exc:
+        code = "invalid_request"
+        if isinstance(exc, MigrationBlocked):
+            code = "migration_blocked"
+        elif isinstance(exc, ConfigError):
+            code = "invalid_config"
+        elif isinstance(exc, (StoreError, sqlite3.Error, OSError)):
+            code = "store_error"
+        result = {
+            "dreaming_api": 1,
+            "op": request.get("op") if isinstance(request, dict) else None,
+            "ok": False,
+            "code": code,
+            "message": str(exc),
+        }
+    print(json.dumps(result))
+    return 0 if result["ok"] else 2
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="dream", description="Learn from recorded agent sessions")
     parser.add_argument("--version", action="version", version=f"dream {__version__}")
     parser.add_argument("--config", type=Path)
     commands = parser.add_subparsers(dest="command")
+    commands.add_parser("api", help="Read one versioned knowledge request as JSON from stdin")
     probe = commands.add_parser("probe", help="Check backend capabilities and isolation")
     probe.add_argument("--dry-run", action="store_true")
     probe.add_argument("--backend", action="append")
@@ -38,6 +76,8 @@ def main(argv: list[str] | None = None) -> int:
     reader.add_argument("--sessions", type=int, default=10)
     args = parser.parse_args(argv)
     try:
+        if args.command == "api":
+            return _api_main(args.config)
         if args.command == "probe":
             config = load_config(args.config)
             from dreaming.backends.probe import probe_config

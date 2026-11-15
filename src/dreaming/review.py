@@ -86,7 +86,11 @@ def review_context(store, run_id, config, roles, *, scope=None, now=None):
     now = now or datetime.now(UTC)
     scope = normalise_scope(scope or {})
     observations = [r for r in available_observations(store) if in_scope(r, scope)]
-    files = [r for r in available_file_findings(store) if r["pattern_id"] and in_scope(r, scope)]
+    files = [
+        r
+        for r in available_file_findings(store)
+        if r["pattern_id"] and not r["imported"] and in_scope(r, scope)
+    ]
     ranked = rank_patterns(store, config, now=now, run_id=run_id)
     signals = {r["id"]: dict(position=i + 1, **r) for i, r in enumerate(ranked)}
     grouped = clusters([*observations, *files])
@@ -396,6 +400,8 @@ class ReviewHandler:
             raise ValueError("unavailable_evidence")
         rows = available_observations(self.store, evidence_ids=ids)
         files = available_file_findings(self.store, ids)
+        if any(row["imported"] for row in files):
+            raise ValueError("imported_evidence")
         if {r["id"] for r in [*rows, *files]} != set(ids):
             raise ValueError("unavailable_evidence")
         if self.scope and any(

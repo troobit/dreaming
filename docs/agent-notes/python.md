@@ -34,3 +34,6 @@
   redaction markers must themselves remain unchanged on a second pass.
 - Compare aware source timestamps as datetimes when finding the latest support;
   ISO strings with different timezone offsets do not sort chronologically.
+- Preserve subprocess stdout whitespace when reading file blobs for exact text
+  edits. `str.strip()` is suitable for Git identifiers but destroys a file's
+  leading whitespace and final newline; `config.git(..., strip=False)` preserves it.

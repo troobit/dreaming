@@ -213,7 +213,9 @@ def available_file_findings(store: Store, evidence_ids=None) -> list[dict]:
 
 
 def pattern_statistics(store: Store, pattern_id: str) -> dict:
-    observations = available_observations(store, pattern_id=pattern_id)
+    observations = [
+        row for row in available_observations(store, pattern_id=pattern_id) if not row["imported"]
+    ]
     return {
         "observations": len(observations),
         "sessions": len({interaction_key(row) for row in observations}),
@@ -303,7 +305,9 @@ def _support_sufficient(
     kind: str = "",
     scope: dict | None = None,
 ) -> bool:
-    observations = available_observations(store, evidence_ids=evidence)
+    observations = [
+        row for row in available_observations(store, evidence_ids=evidence) if not row["imported"]
+    ]
     if scope:
         observations = [
             row
@@ -317,6 +321,17 @@ def _support_sufficient(
                 )
             )
         ]
+    if kind == "learning":
+        observations = [
+            row
+            for row in observations
+            if row["kind"] == "user_statement"
+            and row["observation_type"] in {"learning", "learning_goal"}
+            and (row["interactive"] or _user_statement(store, row))
+        ]
+        return (
+            promotion_status(observations, config.thresholds.min_sessions, "learning") == "active"
+        )
     if not (
         any(_user_statement(store, row) for row in observations)
         or len({interaction_key(row) for row in observations}) >= config.thresholds.min_sessions
@@ -385,7 +400,8 @@ def change_is_eligible(store: Store, change_id: str, config: Config) -> bool:
 
 def explicit_statement(row: dict) -> bool:
     return (
-        row["kind"] == "user_statement"
+        not row.get("imported", False)
+        and row["kind"] == "user_statement"
         and row["modality"] == "asserted"
         and row.get("observation_type", "")
         in {"", "preference", "correction", "user_statement", "learning_goal"}
@@ -393,22 +409,20 @@ def explicit_statement(row: dict) -> bool:
 
 
 def promotion_status(rows: list[dict], min_sessions: int, kind: str) -> str:
+    rows = [row for row in rows if not row.get("imported", False)]
+    if kind == "learning":
+        rows = [
+            row
+            for row in rows
+            if row["kind"] == "user_statement"
+            and row.get("observation_type") in {"learning", "learning_goal"}
+        ]
     enough = (
         any(explicit_statement(row) for row in rows)
         or len({interaction_key(row) for row in rows}) >= min_sessions
     )
     if kind == "approach_worked":
         enough &= any(row["outcome"] in {"user-confirmed", "check-confirmed"} for row in rows)
-    if kind == "learning":
-        enough &= any(
-            row["kind"] == "user_statement"
-            and row.get("observation_type")
-            in {
-                "learning",
-                "learning_goal",
-            }
-            for row in rows
-        )
     return "active" if enough else "candidate"
 
 

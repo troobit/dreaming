@@ -29,7 +29,7 @@ from dreaming.config import (
 )
 from dreaming.redact import redact
 from dreaming.sessions import SessionError
-from dreaming.steps import CallResult, Step, Steps, insert_steps
+from dreaming.steps import CallResult, Step, StepDeferred, Steps, insert_steps
 from dreaming.store import Store, snapshot_connection
 
 
@@ -390,6 +390,16 @@ class Engine:
                     handler.resize(context_before)
                 try:
                     metadata = handler.prepare(step)
+                except StepDeferred as exc:
+                    raw = json.dumps({"deferred": str(exc)})
+                    self.steps.apply(
+                        step.key,
+                        raw,
+                        lambda conn, output, handler=handler, step=step: handler.apply(
+                            conn, step, output
+                        ),
+                    )
+                    continue
                 except SessionError as exc:
                     if exc.code not in {"forgotten", "forgotten_input"}:
                         raise
@@ -442,6 +452,9 @@ class Engine:
                     )
                     return "partial"
                 raw = self.steps.saved_output(step.key)
+            if hasattr(handler, "before_apply"):
+                # Source and Git reads must finish before opening a write transaction.
+                raw = handler.before_apply(step, raw if raw is not None else "null")
             self.steps.apply(
                 step.key,
                 raw if raw is not None else "null",

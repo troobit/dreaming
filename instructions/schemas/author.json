@@ -135,6 +135,24 @@
     },
     "external_input": {
       "type": "boolean"
+    },
+    "depends_on": {
+      "type": "array",
+      "items": {"type": "string", "minLength": 1}
+    },
+    "skill": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "name": {"type": "string", "minLength": 1},
+            "interactive": {"type": "boolean"}
+          },
+          "required": ["name", "interactive"],
+          "additionalProperties": false
+        },
+        {"type": "null"}
+      ]
     }
   },
   "required": [
@@ -143,7 +161,9 @@
     "evidence_ids",
     "edits",
     "learning",
-    "external_input"
+    "external_input",
+    "depends_on",
+    "skill"
   ],
   "additionalProperties": false
 }

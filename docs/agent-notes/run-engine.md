@@ -19,10 +19,14 @@
   `Dispatcher` owns each attempt's call rows and shares the engine's budget and
   interrupt flag. Its handler `prepare` returns role, prompt, schema, tools,
   optional lineage and a checkpoint callback. The callback verifies reader
-  quotes before redaction and persistence. Read/Review handlers are available;
-  researcher, author and public start/API wiring remain later tasks.
+  quotes before redaction and persistence. Read/Review/Research/Author handlers
+  are available; public dream start/resume wiring remains in task 22.
   Handlers with `resize` receive the smallest live fallback context; a reduced
   model context resizes the pending input before retrying.
+- `StepDeferred` records a preflight reason without making a model call. A
+  handler's optional `before_apply` hook runs outside the write transaction,
+  including on recovery, so reopening evidence or reading Git cannot hold a
+  database writer across subprocesses. Its result is then applied atomically.
 - Budgets sum every recorded attempt. Active seconds checkpoint at step/call/wait
   boundaries; waits and downtime do not count. A hard kill loses time since the
   last checkpoint. Readers preserve reserved tokens and a distinct-session cap;

@@ -29,7 +29,7 @@
   a reserved context share; omitted counts are grouped by lens. Pattern merges
   retain aliases so rereads do not recreate merged identities. Decisions retain
   rejected/deferred reasons and candidate ranking signals. Research/Author
-  follow-ups commit with revisions; their handlers belong to the API phase.
+  follow-ups commit with revisions; `authoring.py` supplies their handlers.
 - `dream trial reader` uses committed instructions, one chosen backend and a
   read-only store snapshot. It reports schema/quote rates and total tokens;
   harness probe files live only in a temporary home. It never opens the user's

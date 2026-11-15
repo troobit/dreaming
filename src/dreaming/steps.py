@@ -10,6 +10,10 @@ from dreaming.redact import redact
 from dreaming.store import Store
 
 
+class StepDeferred(Exception):
+    """A preflight condition prevents a model call; retain its reason in the step."""
+
+
 @dataclass(frozen=True)
 class Step:
     key: str

@@ -306,31 +306,31 @@ references:
 
 ## API
 
-- [ ] 20. Researcher and author phases <!-- id:w1na5el -->
+- [x] 20. Researcher and author phases <!-- id:w1na5el -->
   - Blocked-by: w1na5ei (Reviewer phase), w1na5dx (Claude Code and Codex harness adapters)
   - Stream: 1
   - Requirements: [4.2](requirements.md#4.2), [4.4](requirements.md#4.4), [4.6](requirements.md#4.6), [9.2](requirements.md#9.2), [9.3](requirements.md#9.3), [9.10](requirements.md#9.10), [11.5](requirements.md#11.5), [15.1](requirements.md#15.1), [15.2](requirements.md#15.2)
-  - [ ] 20.1. Write tests for Research and Author steps <!-- id:w1na5em -->
+  - [x] 20.1. Write tests for Research and Author steps <!-- id:w1na5em -->
     - Findings with sources kept apart from observations; each Author step first re-verifies cited evidence against current files and defers with a reason; author emits id-keyed edits citing a supporting and a counter case, never whole-file rewrites; learning recommendation versus change output; depends_on defines linked groups; `external_input` flag set when fetched web or PR text was received; interactive skills deferred and reported
     - Blocked-by: w1na5ei (Reviewer phase), w1na5dx (Claude Code and Codex harness adapters)
     - Stream: 1
     - Requirements: [4.6](requirements.md#4.6), [9.3](requirements.md#9.3), [9.10](requirements.md#9.10), [11.5](requirements.md#11.5), [15.1](requirements.md#15.1), [15.2](requirements.md#15.2)
-  - [ ] 20.2. Implement Research and Author steps <!-- id:w1na5en -->
+  - [x] 20.2. Implement Research and Author steps <!-- id:w1na5en -->
     - Target repository CLAUDE.md/AGENTS.md passed as counted input; evidence ids cited in every change (file findings cite repository, revision, path, location)
     - Blocked-by: w1na5em (Write tests for Research and Author steps)
     - Stream: 1
     - Requirements: [4.2](requirements.md#4.2), [4.4](requirements.md#4.4), [9.2](requirements.md#9.2), [11.5](requirements.md#11.5)
 
-- [ ] 21. Knowledge operations: recall, search, get, feedback, export, import <!-- id:w1na5eo -->
+- [x] 21. Knowledge operations: recall, search, get, feedback, export, import <!-- id:w1na5eo -->
   - Blocked-by: w1na5ef (Knowledge rules: promotion, scope, conflicts and ranking)
   - Stream: 1
   - Requirements: [11.7](requirements.md#11.7), [13.5](requirements.md#13.5), [14.1](requirements.md#14.1), [14.2](requirements.md#14.2), [14.3](requirements.md#14.3), [14.5](requirements.md#14.5), [14.6](requirements.md#14.6), [14.7](requirements.md#14.7), [15.3](requirements.md#15.3)
-  - [ ] 21.1. Write tests and property tests for the knowledge operations <!-- id:w1na5ep -->
+  - [x] 21.1. Write tests and property tests for the knowledge operations <!-- id:w1na5ep -->
     - Property: estimated_tokens never exceeds the limit, ordering independent of input order (specificity, confidence, recency, id), out-of-scope, unresolved and non-active items absent by default; evidence references carry redacted quote and modality; feedback idempotent by feedback id with cited/present_only revisions; export then import into a fresh store then export equals the first, importing twice equals once, imported items marked and excluded from promotion counts; incompatible_version and not_found codes
     - Blocked-by: w1na5ef (Knowledge rules: promotion, scope, conflicts and ranking)
     - Stream: 1
     - Requirements: [14.2](requirements.md#14.2), [14.3](requirements.md#14.3), [14.5](requirements.md#14.5), [14.6](requirements.md#14.6), [14.7](requirements.md#14.7)
-  - [ ] 21.2. Implement api.py knowledge operations <!-- id:w1na5eq -->
+  - [x] 21.2. Implement api.py knowledge operations <!-- id:w1na5eq -->
     - One JSON request on stdin, one response on stdout, envelope {"dreaming_api": 1, "op": ...}; estimator utf8_bytes/4 stated in responses; pending_reassessment mark shown; no agentic-coding path required
     - Blocked-by: w1na5ep (Write tests and property tests for the knowledge operations)
     - Stream: 1

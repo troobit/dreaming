@@ -28,6 +28,34 @@ tool restrictions. The full reading and knowledge pipeline remains in later phas
 Requires Python 3.12+, uv, and Git on a local POSIX filesystem. Install with
 `make install`, or use `uv run dream` during development.
 
+The API phase adds Research and Author library handlers and the versioned
+knowledge operations in `dream api`. Research retains findings with sources;
+Author rechecks evidence and retains small, evidence-cited edits or learning
+recommendations. Branch creation and adoption are implemented by later phases.
+
+`dream api` accepts one JSON request on stdin and returns one JSON response.
+Read operations do not create or modify the private store. For example:
+
+```sh
+echo '{"dreaming_api":1,"op":"knowledge.recall","project":"/path/to/project","limit":1024}' | dream api
+echo '{"dreaming_api":1,"op":"knowledge.search","query":"testing","project":"/path/to/project"}' | dream api
+echo '{"dreaming_api":1,"op":"knowledge.get","id":"k:..."}' | dream api
+echo '{"dreaming_api":1,"op":"knowledge.export"}' | dream api
+```
+
+Recall/search return scoped items in a deterministic order, with bounded quotes,
+modality, confidence, pending reassessment and estimated token use. The default
+limit is 1024 estimated tokens. Feedback uses `knowledge.feedback` with a unique
+`feedback_id` and `revisions: [{"item_id":"k:...","version":1,"usage":"cited"}]`;
+`usage` may also be `present_only`. An outcome's `basis` is `user-confirmed`,
+`check-confirmed` (with `check_name`) or `unknown`.
+
+`knowledge.export` returns a `dreaming-export` document in its `export` field.
+Pass that document as `export` to `knowledge.import` to populate another store;
+identifiers, history, feedback, dispositions and forgotten markers survive the
+exchange, and repeated imports change nothing. Imported evidence is retained
+without counting as fresh support for promotion.
+
 Versioned installation requires a clean committed checkout. It installs that
 revision under `DREAMING_HOME/versions/`, switches `current`, and links the
 launcher at `~/.local/bin/dream`. The launcher selects the recorded revision for

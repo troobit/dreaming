@@ -26,6 +26,8 @@ INSTRUCTIONS = Path(__file__).resolve().parents[1] / "instructions"
                 "edits": [],
                 "learning": None,
                 "external_input": False,
+                "depends_on": [],
+                "skill": None,
             },
         ),
         ("replayer", {"response": "A bounded replay response"}),

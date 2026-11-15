@@ -81,6 +81,19 @@ def test_installed_wheel_runs_without_checkout(tmp_path):
         check=True,
     )
     assert result.stdout.strip() == "dream 0.1.0"
+    response = subprocess.run(
+        [str(venv / "bin" / "dream"), "api"],
+        input='{"dreaming_api":1,"op":"knowledge.recall","limit":64}',
+        cwd=tmp_path,
+        env=env,
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    import json
+
+    payload = json.loads(response.stdout)
+    assert payload["ok"] and payload["items"] == []
     subprocess.run(
         [
             str(python),

@@ -79,7 +79,7 @@ def test_review_context_reserved_clusters_rank_and_omissions(reader_env):
             "? ,run_id,source,session_id,entry_id||?,source_location,representation_version,"
             "redacted_quote||?,kind,modality,excluded,outcome,outcome_evidence,lens_id,lens_version,"
             "?,backend,model,subject,project,domain,observed_at,availability,"
-            "observation_type,pattern_key,declared_scope,source_entry_id "
+            "observation_type,pattern_key,declared_scope,source_entry_id,imported "
             "FROM observations WHERE id='e0'",
             (f"long{i}", str(i), "x" * 1000, f"p{i}"),
         )
@@ -195,6 +195,23 @@ def test_pattern_merge_reuses_identity_and_keeps_history(reader_env):
         ]
         == 1
     )
+
+
+def test_imported_file_findings_cannot_create_fresh_candidates(reader_env):
+    store, config, roles, _ = reader_env
+    store.connection.execute("INSERT INTO patterns(id,key) VALUES ('p','references:broken')")
+    store.connection.execute(
+        "INSERT INTO file_findings(id,repo,revision,path,location,lens_id,finding,"
+        "pattern_id,imported) "
+        "VALUES ('f','/repo','abc','AGENTS.md','line:4','references','Broken link','p',1)"
+    )
+    assert not review_context(store, "r", config, roles)["patterns"]
+    handler = ReviewHandler(store, "r", config, roles)
+    operation = dict(
+        op="propose_change", pattern_id="p", evidence_ids=["f"], summary="Fix link", repo="/repo"
+    )
+    with pytest.raises(ValueError, match="imported_evidence"):
+        handler._candidate(store.connection, operation, {"f"})
 
 
 def test_review_order_is_independent_of_operation_order(reader_env):

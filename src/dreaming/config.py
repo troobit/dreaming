@@ -16,7 +16,7 @@ class ConfigError(ValueError):
     """Invalid configuration or private storage location (CLI exit 2)."""
 
 
-def git(repo: Path, *args: str) -> str:
+def git(repo: Path, *args: str, strip: bool = True) -> str:
     """Run Git without caller-supplied repository/index/worktree overrides."""
     env = {key: value for key, value in os.environ.items() if not key.startswith("GIT_")}
     try:
@@ -31,7 +31,7 @@ def git(repo: Path, *args: str) -> str:
         )
     except (OSError, subprocess.SubprocessError) as exc:
         raise ConfigError(f"git failed in {repo}: {exc}") from exc
-    return result.stdout.strip()
+    return result.stdout.strip() if strip else result.stdout
 
 
 def require_external(path: Path | str) -> Path:

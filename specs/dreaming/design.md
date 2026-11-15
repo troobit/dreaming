@@ -292,6 +292,17 @@ Exit codes follow screw except for budget exhaustion: 0 success (including `budg
 
 ## Risks and Assumptions
 
+- API-phase portability (2026-11-15): Research and Author use the existing
+  dispatcher and snapshot roles. Author returns validated delta edits to the
+  private store; worktrees, commits and adoption remain tasks 23–25. Until that
+  work lands, author calls expose read tools only. Evidence is reopened through
+  apsis or a registered shared-json document, and file findings are checked
+  against the target's configured default branch. Unavailable or changed evidence
+  defers authoring before a model call. Exact edit preimages are checked again
+  when applying the saved response. Without durable tool-result telemetry, a
+  research result from a call permitted web/PR access is conservatively marked
+  external input even if the model omits its sources. Knowledge exchange marks
+  imported evidence separately so it cannot provide fresh promotion counts.
 - Observation/knowledge portability (2026-11-15): source locations use canonical
   `entry:N` identifiers even when a source repeats or omits its own entry ids.
   The dispatcher verifies reader quotes against unredacted source entries before

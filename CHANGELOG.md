@@ -8,6 +8,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- Versioned `dream api` knowledge recall, search, get, feedback, export and import, with scoped token-bounded retrieval, quoted evidence, revision history and portable exclusion markers.
+- Resumable Research and Author handlers with source citations, live evidence preflight, counted repository instructions, validated delta edits, linked change dependencies and separate learning recommendations.
+- Imported-evidence provenance, model-free preflight deferrals, recovery checks outside database write transactions and installed-wheel API validation.
 - Verified and redacted observation checkpoints with stable evidence identifiers, source locations, attribution gates, confirmed outcomes, and source-availability markers.
 - Resumable reader and reviewer steps with deterministic clustering, bounded review context, scoped knowledge promotion and revision history, protected corrections and dismissals, ranking, reassessment, and atomic research/author follow-ups.
 - Read-only `dream trial reader --backend NAME --sessions N` calibration reporting schema validity, quote matches, and token usage without changing the user's store.
