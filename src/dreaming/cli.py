@@ -11,14 +11,13 @@ from pathlib import Path
 from dreaming import (
     __version__,
     api,
-    budget,
     config,
+    knowledge,
     observe,
     plan,
     roles,
     run,
     sessions,
-    steps,
     store,
 )
 from dreaming.backends import probe
@@ -173,43 +172,97 @@ def _run(args: argparse.Namespace) -> int:
     return started.process.wait() if args.wait else 0
 
 
+def _resume(args: argparse.Namespace) -> int:
+    home = config.ensure_home()
+    started = run.start(
+        home,
+        config.load_config(home),
+        overrides=_overrides(args),
+        resume=True,
+        run_id=args.run,
+    )
+    print(f"resumed {started.run_id}")
+    print(f"  selection: {json.dumps(started.selection)}")
+    print(f"  overrides: {json.dumps(started.overrides)}")
+    sys.stdout.flush()
+    return started.process.wait() if args.wait else 0
+
+
+def _open_store(run_id: str | None):
+    """The store, or None when no dream has run yet."""
+    path = store.store_path(config.dreaming_home())
+    if path.exists():
+        return store.open_store(path)
+    if run_id:
+        raise DreamingError(f"no record of dream {run_id}", USAGE_ERROR, "not_found")
+    return None
+
+
 def _status(args: argparse.Namespace) -> int:
-    home = config.dreaming_home()
-    path = store.store_path(home)
-    if not path.exists():
-        if args.run:
-            raise DreamingError(
-                f"no record of dream {args.run}", USAGE_ERROR, "not_found"
-            )
+    conn = _open_store(args.run)
+    if conn is None:
         print("no dream has run yet")
         return 0
-    conn = store.open_store(path)
     try:
-        row = run.find_run(conn, args.run)
         if args.plan:
-            print(plan.write(home, conn, row["id"]))
+            row = run.find_run(conn, args.run)
+            print(plan.write(config.dreaming_home(), conn, row["id"]))
             return 0
-        print(f"dream {row['id']}: {row['status']}")
-        print(f"  requested by {row['requester']}, started {row['started_at']}")
-        if row["status"] == "waiting":
-            print(f"  waiting until {row['wait_until']}: {row['wait_notice']}")
-        if row["error"]:
-            print(f"  stopped by: {row['error']}")
-        counts: dict[str, int] = {}
-        for step in steps.load(conn, row["id"]):
-            counts[step.state] = counts.get(step.state, 0) + 1
-        if counts:
-            shown = ", ".join(f"{n} {state}" for state, n in counts.items())
-            print(f"  steps: {shown}")
-        limits = json.loads(row["budget"])
-        used = budget.tokens_used(conn, row["id"])
-        print(
-            f"  tokens: {used} of {limits.get('tokens', '?')}; running "
-            f"{row['active_seconds'] / 60:.1f} of "
-            f"{limits.get('wall_clock_minutes', '?')} minutes"
-        )
+        state = run.status(conn, args.run)
     finally:
         conn.close()
+    print(f"dream {state['run_id']}: {state['status']}")
+    print(f"  requested by {state['requester']}, started {state['started_at']}")
+    waiting = state["waiting"]
+    if waiting:
+        print(f"  waiting until {waiting['until']}")
+        if waiting.get("message"):
+            print(f"  {waiting['message']}")
+    if state["error"]:
+        print(f"  stopped by: {state['error']}")
+    if state["steps"]:
+        shown = ", ".join(f"{n} {s}" for s, n in state["steps"].items())
+        print(f"  steps: {shown}")
+    limits = state["budget"]
+    print(
+        f"  tokens: {state['tokens_used']} of {limits.get('tokens', '?')}; running "
+        f"{state['active_seconds'] / 60:.1f} of "
+        f"{limits.get('wall_clock_minutes', '?')} minutes"
+    )
+    return 0
+
+
+def _discard(args: argparse.Namespace) -> int:
+    result = run.discard(config.ensure_home(), args.run)
+    print(f"discarded {result['run_id']}")
+    for removed in result["branches"]:
+        print(f"  deleted {removed['branch']} in {removed['repo']}")
+    return 0
+
+
+def _report(args: argparse.Namespace) -> int:
+    conn = _open_store(args.run)
+    if conn is None:
+        raise DreamingError("no dream has run yet", USAGE_ERROR, "not_found")
+    try:
+        result = api.dream_report(conn, {}, {"run_id": args.run}, None)
+    finally:
+        conn.close()
+    print(result["report"])
+    return 0
+
+
+def _forget(args: argparse.Namespace) -> int:
+    handler = knowledge.forget_session if args.forget else knowledge.restore_session
+    conn = store.open_store(store.store_path(config.ensure_home()))
+    try:
+        result = handler(conn, args.session, args.source)
+    finally:
+        conn.close()
+    verb = "forgot" if args.forget else "restored"
+    print(f"{verb} {args.session}" if result["changed"] else "nothing changed")
+    if result["reassess"]:
+        print(f"  queued for reassessment: {', '.join(result['reassess'])}")
     return 0
 
 
@@ -355,6 +408,31 @@ def _parser() -> argparse.ArgumentParser:
     dream.add_argument("--json", action="store_true", help="print the dry run as JSON")
     dream.set_defaults(handler=_run)
 
+    resume = commands.add_parser(
+        "resume",
+        help="resume the interrupted dream; only backend choices may change",
+    )
+    resume.add_argument(
+        "run", nargs="?", metavar="RUN", help="default: the interrupted one"
+    )
+    resume.add_argument(
+        "--backend",
+        action="append",
+        default=[],
+        metavar="ROLE=NAME[,NAME...]",
+        help="a role's backends in fallback order",
+    )
+    resume.add_argument(
+        "--wait", action="store_true", help="wait for the dream and exit with its code"
+    )
+    resume.set_defaults(
+        handler=_resume,
+        sessions=None,
+        tokens=None,
+        minutes=None,
+        fallback_on_usage_limit=False,
+    )
+
     status = commands.add_parser("status", help="show a dream's state")
     status.add_argument("run", nargs="?", metavar="RUN", help="default: the latest")
     status.add_argument(
@@ -363,6 +441,31 @@ def _parser() -> argparse.ArgumentParser:
         help="write the steps as a rune task file and print its path",
     )
     status.set_defaults(handler=_status)
+
+    discard = commands.add_parser(
+        "discard",
+        help="discard the interrupted dream: delete its unmerged branches and "
+        "the records it wrote",
+    )
+    discard.add_argument(
+        "run", nargs="?", metavar="RUN", help="default: the interrupted one"
+    )
+    discard.set_defaults(handler=_discard)
+
+    report = commands.add_parser("report", help="print the path of a dream's report")
+    report.add_argument("run", nargs="?", metavar="RUN", help="default: the latest")
+    report.set_defaults(handler=_report)
+
+    for name, forget, text in (
+        ("forget", True, "stop counting a session and every copy of it (2.11)"),
+        ("restore", False, "count a forgotten session again"),
+    ):
+        command = commands.add_parser(name, help=text)
+        command.add_argument("session", metavar="SESSION")
+        command.add_argument(
+            "--source", help="the session's source, when the id is ambiguous"
+        )
+        command.set_defaults(handler=_forget, forget=forget)
 
     trial = commands.add_parser(
         "trial", help="try a role on recorded sessions without storing anything"

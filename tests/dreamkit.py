@@ -5,7 +5,7 @@ from pathlib import Path
 
 from runkit import FakeClock, LocalPhase, add_run, make_runner
 
-from dreaming import config, observe, review, roles
+from dreaming import author, config, observe, review, roles
 from dreaming.backends import CallResult
 
 INSTRUCTIONS = Path(__file__).parents[1] / "instructions"
@@ -34,27 +34,58 @@ def prompt_input(prompt):
     return json.loads(prompt[start:end])
 
 
+def make_edits(workdir, output):
+    """Make the edits an author answer declares in its work copy, as a model
+    with file tools would: an add follows its section (or creates the file), a
+    replace or delete rewrites the section's text. Paths outside the copy are
+    left alone."""
+    for change in output.get("changes", []):
+        for edit in change["edits"]:
+            if not author.inside(edit["path"]):
+                continue
+            path = Path(workdir) / edit["path"]
+            text = path.read_text() if path.exists() else None
+            section, new = edit["section"], edit["text"] or ""
+            if text is None:
+                if edit["action"] == "add":
+                    path.parent.mkdir(parents=True, exist_ok=True)
+                    path.write_text(new)
+            elif edit["action"] == "add":
+                path.write_text(text.replace(section, f"{section}\n{new}", 1))
+            elif section in text:
+                path.write_text(text.replace(section, new, 1))
+
+
 class ScriptedModel:
     """Answers each call with `answer(role, data)`, where `data` is the call's
-    input; a callable answer may also raise."""
+    input; a callable answer may also raise. A call given a work copy makes the
+    answer's edits there with `edit(workdir, output)`."""
 
     name = "fake"
     release_date = ""
     accepts_session_id = False
 
-    def __init__(self, answer, *, context_tokens=100_000, before=None):
+    def __init__(self, answer, *, context_tokens=100_000, before=None, edit=make_edits):
         self.answer = answer
         self.context_tokens = context_tokens
         self.before = before
+        self.edit = edit
         self.inputs = []
+        self.workdirs = []
+        self.tools = []
 
-    def call(self, role, prompt, schema, tools, session_id=None):
+    def call(self, role, prompt, schema, tools, session_id=None, workdir=None):
         data = prompt_input(prompt)
         if self.before:
             self.before(role, data)
         self.inputs.append((role, data))
+        self.tools.append((role, list(tools)))
+        output = self.answer(role, data)
+        if workdir is not None:
+            self.workdirs.append(workdir)
+            self.edit(workdir, output)
         return CallResult(
-            self.answer(role, data),
+            output,
             100,
             20,
             session_ref=f"fake-session-{len(self.inputs)}",
@@ -144,6 +175,7 @@ def dream(
             "review": review.ReviewPhase(found),
             "research": LocalPhase(),
             "author": LocalPhase(),
+            "adopt": LocalPhase(),
         },
         model=model,
         clock=clock or FakeClock(),

@@ -17,8 +17,13 @@ the evidence it was given. A learning recommendation keeps its research apart
 from its evidence. The program, not the model, writes the evidence trailer of
 the commit message (9.2).
 
-The change is stored as `proposed`; committing it on the dream branch belongs
-to adoption (`adopt.py`).
+A change is written by the author itself, with its file tools, in the run's
+work copy of the repository on the dream branch, the only directory it may
+write (9.1, 9.4). Once the answer passes its checks, the program commits the
+edits as the change's one commit (`adopt.commit_change`) before the step's
+results are stored, so the next candidate's call starts from a clean copy. The
+change is then `proposed`, or `withheld` with its patch when the public scan or
+a generate command stops it (9.5, 9.12).
 """
 
 from __future__ import annotations
@@ -30,7 +35,7 @@ from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
 
-from dreaming import config, knowledge, roles, steps
+from dreaming import adopt, config, knowledge, roles, scan, steps
 from dreaming.errors import Rejected
 from dreaming.observe import evidence_input_ref, verify
 from dreaming.run import Context, Outcome
@@ -101,33 +106,6 @@ def inside(path: str) -> bool:
     )
 
 
-# Linked groups (9.10)
-
-
-def linked_groups(conn: sqlite3.Connection, run_id: str) -> list[list[str]]:
-    """Repositories adopted together: those whose changes in this run depend on
-    each other, directly or through others. A repository linked to none is a
-    group of one."""
-    parent: dict[str, str] = {}
-
-    def find(repo: str) -> str:
-        parent.setdefault(repo, repo)
-        while parent[repo] != repo:
-            parent[repo] = parent[parent[repo]]
-            repo = parent[repo]
-        return repo
-
-    rows = conn.execute("SELECT repo, depends_on FROM changes WHERE run = ?", (run_id,))
-    for row in rows:
-        find(row["repo"])
-        for other in json.loads(row["depends_on"]):
-            parent[find(other)] = find(row["repo"])
-    groups: dict[str, list[str]] = {}
-    for repo in parent:
-        groups.setdefault(find(repo), []).append(repo)
-    return sorted(sorted(group) for group in groups.values())
-
-
 # What the author is given
 
 
@@ -190,6 +168,10 @@ class Authored:
     model: str | None = None
     # Each edited path's text on the default branch, None for a new file.
     current: dict[str, str | None] = field(default_factory=dict)
+    # A change answer that passed its checks, and its commit or withholding.
+    change: dict | None = None
+    committed: adopt.Committed | None = None
+    rejected: str | None = None
 
 
 class AuthorPhase:
@@ -205,26 +187,50 @@ class AuthorPhase:
         role = self.instructions.roles["author"]
         try:
             given, data = self._input(conn, cfg, authored.candidate)
+            if given.repo is not None:
+                work_path = adopt.work_path(ctx.home, ctx.run_id, given.repo.name)
+                data["repository"]["work_copy"] = str(work_path)
             prompt = _fit(cfg, role, data)
         except Rejected as rejected:
             authored.deferred = rejected.reason
             return authored
         authored.given = given
+        work = None
+        if given.repo is not None:
+            work = adopt.work_copy(ctx.home, cfg, ctx.run_id, given.repo.name)
         authored.output = ctx.call(
             "author",
             prompt,
             role.schema,
             input_ref=evidence_input_ref(conn, [*given.evidence, *given.counter]),
+            work=work,
         )
         authored.backend, authored.model = steps.answered_by(conn, ctx.run_id, step.key)
-        if given.repo is not None:
-            paths = {
-                edit["path"]
-                for change in authored.output["changes"]
-                for edit in change["edits"]
-                if inside(edit["path"])
-            }
-            authored.current = {path: given.repo.read(path) for path in sorted(paths)}
+        if work is None:
+            return authored
+        paths = {
+            edit["path"]
+            for change in authored.output["changes"]
+            for edit in change["edits"]
+            if inside(edit["path"])
+        }
+        authored.current = {path: given.repo.read(path) for path in sorted(paths)}
+        out = authored.output
+        if out["outcome"] == "change" and out["verification"]["supported"]:
+            try:
+                authored.change = _check_change(conn, cfg, ctx.run_id, authored)
+                authored.committed = adopt.commit_change(
+                    ctx.home,
+                    cfg,
+                    ctx.run_id,
+                    work,
+                    authored.change["id"],
+                    authored.change["commit_message"],
+                    {edit["path"] for edit in authored.change["edits"]},
+                    scan.evidence_quotes(conn, [*given.evidence, *given.counter]),
+                )
+            except Rejected as rejected:
+                authored.rejected = rejected.reason
         return authored
 
     def _input(self, conn: sqlite3.Connection, cfg: dict, c: Mapping):
@@ -240,6 +246,12 @@ class AuthorPhase:
                 f"{cfg['thresholds']['min_sessions']} distinct sessions needed (4.5)"
             )
         repo = repository(cfg, c["repo"]) if c["proposal"] == "change" else None
+        earlier = repo and adopt.unfinished_adoption(conn, cfg, repo.name, c["run"])
+        if earlier:
+            raise Rejected(
+                f"dream {earlier['run']} merged into {repo.name} without finishing "
+                "its deploy; finish or undo that adoption first"
+            )
         cited = conn.execute(
             "SELECT repo, path FROM file_findings"
             " WHERE evidence_id IN (SELECT value FROM json_each(?)) ORDER BY path",
@@ -324,8 +336,10 @@ class AuthorPhase:
                 )
             if out["outcome"] == "learning":
                 made = _store_learning(conn, cfg, step.run, a)
+            elif a.rejected is not None:
+                raise Rejected(a.rejected)
             else:
-                made = _store_change(conn, cfg, step.run, a)
+                made = _store_change(conn, step.run, a)
         except Rejected as rejected:
             steps.record_rejection(
                 conn,
@@ -416,7 +430,9 @@ def commit_message(
     return f"{message.strip()}\n\n" + "\n".join(trailers)
 
 
-def _store_change(conn: sqlite3.Connection, cfg: dict, run_id: str, a: Authored):
+def _check_change(conn: sqlite3.Connection, cfg: dict, run_id: str, a: Authored):
+    """The change an answer proposes, checked against the authoring rules; it is
+    `Rejected` with the first rule it breaks."""
     c, out, given = a.candidate, a.output, a.given
     if out["learning"] or len(out["changes"]) != 1:
         raise Rejected(
@@ -450,31 +466,54 @@ def _store_change(conn: sqlite3.Connection, cfg: dict, run_id: str, a: Authored)
     external = given.fetched or any(
         tool not in config.BUILTIN_TOOLS for tool in cfg["tools"]["author"]
     )
-    change_id = knowledge.new_id("ch", run_id, c["id"])
+    return {
+        "id": knowledge.new_id("ch", run_id, c["id"]),
+        "summary": change["summary"],
+        "commit_message": commit_message(
+            conn, change["commit_message"], evidence, given.repo.public
+        ),
+        "depends_on": depends_on,
+        "evidence": evidence,
+        "edits": change["edits"],
+        "external_input": external,
+    }
+
+
+def _store_change(conn: sqlite3.Connection, run_id: str, a: Authored) -> str:
+    """The checked change, `proposed` with its commit on the dream branch or
+    `withheld` with the reason and its saved patch."""
+    c, change, committed = a.candidate, a.change, a.committed
+    withheld = committed.withheld is not None
     conn.execute(
         "INSERT INTO changes (id, run, pattern_id, candidate_id, repo, summary,"
         " commit_message, depends_on, evidence, edits, research, external_input,"
-        " status, rank, base_revision, created_at)"
-        " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'proposed', ?, ?, ?)",
+        " status, reason, branch, commit_sha, patch_path, rank, base_revision,"
+        " created_at)"
+        " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         (
-            change_id,
+            change["id"],
             run_id,
             c["pattern_id"],
             c["id"],
             c["repo"],
             change["summary"],
-            commit_message(conn, change["commit_message"], evidence, given.repo.public),
-            json.dumps(depends_on),
-            json.dumps(evidence),
+            change["commit_message"],
+            json.dumps(change["depends_on"]),
+            json.dumps(change["evidence"]),
             json.dumps(change["edits"]),
-            json.dumps(given.research),
-            int(external),
+            json.dumps(a.given.research),
+            int(change["external_input"]),
+            "withheld" if withheld else "proposed",
+            committed.withheld,
+            None if withheld else adopt.branch_name(run_id),
+            committed.sha,
+            committed.patch,
             json.dumps({"position": c["position"], **json.loads(c["signals"])}),
-            given.repo.revision,
+            a.given.repo.revision,
             a.now,
         ),
     )
-    return change_id
+    return change["id"]
 
 
 def _store_learning(conn: sqlite3.Connection, cfg: dict, run_id: str, a: Authored):

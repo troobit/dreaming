@@ -70,7 +70,8 @@ DEFAULTS: dict[str, Any] = {
         "w_projects": 0.5,
         "half_life_days": 30.0,
     },
-    "adoption": {"auto_apply": False},
+    # Generate, lint, test and deploy commands are killed after the timeout.
+    "adoption": {"auto_apply": False, "command_timeout_seconds": 1800},
     "report": {"open_browser": True},
     "scan": {"names_file": "", "quote_chars": 40},
     "instructions": {"repo": "", "branch": "main"},

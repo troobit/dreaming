@@ -9,6 +9,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from dreaming.backends import (
+    WRITE_TOOLS,
     BackendError,
     CallResult,
     call_dir,
@@ -147,6 +148,20 @@ def readable_dirs(cfg: dict) -> list[str]:
     return [str(path) for path in found if path.is_dir()]
 
 
+def call_dirs(cfg: dict, tools: list[str], workdir: Path | None) -> list[str]:
+    """The directories a call's file tools reach beyond its working directory:
+    the work copy alone when it has one, otherwise the readable directories for
+    a call that only reads. A call that can write never reaches the user's
+    checkouts or the knowledge folders (9.1, 9.4)."""
+    if workdir is not None:
+        return [str(workdir)]
+    if not any(tool in BUILTIN_TOOLS for tool in tools):
+        return []
+    if any(tool in WRITE_TOOLS for tool in tools):
+        return []
+    return readable_dirs(cfg)
+
+
 class ClaudeBackend:
     """Calls through `claude -p` with the isolation its probe confirmed."""
 
@@ -183,6 +198,7 @@ class ClaudeBackend:
         schema: dict,
         tools: list[str],
         session_id: str | None = None,
+        workdir: Path | None = None,
     ) -> CallResult:
         session_id = session_id or str(uuid.uuid4())
         builtin = [TOOL_NAMES[tool] for tool in tools if tool in BUILTIN_TOOLS]
@@ -199,7 +215,7 @@ class ClaudeBackend:
             mcp_config=mcp.claude_config(self.servers, tools),
             schema=schema,
             allowed_tools=allowed,
-            add_dirs=readable_dirs(self.cfg) if builtin else [],
+            add_dirs=call_dirs(self.cfg, tools, workdir),
         )
         timeout = self.cfg["thresholds"]["call_timeout_seconds"]
         proc = run_process(

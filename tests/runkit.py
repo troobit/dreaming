@@ -53,7 +53,7 @@ class FakeModel:
         self.answered = 0
         self.prompts = []
 
-    def call(self, role, prompt, schema, tools, session_id=None):
+    def call(self, role, prompt, schema, tools, session_id=None, workdir=None):
         if self.before:
             self.before(role, prompt)
         self.prompts.append((role, prompt))

@@ -75,6 +75,7 @@ def run_review(db, cfg, model, *, run_id=RUN, phases=None, home=Path("/unused"))
             "review": review.ReviewPhase(instructions(cfg)),
             "research": LocalPhase(),
             "author": LocalPhase(),
+            "adopt": LocalPhase(),
         },
         model=model,
         clock=FakeClock(),
@@ -491,6 +492,7 @@ def test_a_crash_before_the_commit_leaves_no_candidates_or_steps(db, cfg):
         "review": CrashingReview(instructions(cfg)),
         "research": LocalPhase(),
         "author": LocalPhase(),
+        "adopt": LocalPhase(),
     }
     with pytest.raises(Crash):
         run_review(db, cfg, model, phases=phases)

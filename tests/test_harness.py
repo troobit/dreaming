@@ -183,6 +183,20 @@ def test_researchers_can_read_target_repositories_and_knowledge_folders(
     assert "--add-dir" not in reader["argv"]
 
 
+def test_a_writing_call_reaches_only_its_work_copy(cfg, home, fakes, tmp_path):
+    """The author edits its work copy and never the user's checkouts or the
+    knowledge folders (9.1, 9.4)."""
+    work = tmp_path / "work-copy"
+    backend = claude_backend(cfg, home)
+    backend.call("author", "p", SCHEMA, ["read", "edit", "write"], workdir=work)
+    backend.call("author", "p", SCHEMA, ["read", "edit", "write"])
+    with_work, without = fakes.calls("claude")
+    argv = with_work["argv"]
+    assert argv[argv.index("--add-dir") + 1 :].count(str(work)) == 1
+    assert str(tmp_path / "target-repo") not in argv
+    assert "--add-dir" not in without["argv"]
+
+
 def test_per_call_mcp_config_holds_only_the_role_servers_and_tools(cfg, home, fakes):
     backend = claude_backend(cfg, home)
     backend.call("researcher", "p", SCHEMA, RESEARCH)
@@ -412,9 +426,19 @@ def test_codex_mcp_servers_are_the_filtered_role_servers(cfg, home, fakes):
     assert _mcp_servers(reader) == {}
 
 
-def test_codex_writes_only_for_roles_with_write_tools(cfg, home, fakes):
-    codex_backend(cfg, home).call("author", "p", SCHEMA, ["read", "edit", "write"])
-    assert flag(only_call(fakes, "codex")["argv"], "--sandbox") == "workspace-write"
+def test_codex_writes_only_in_the_work_copy(cfg, home, fakes, tmp_path):
+    work = tmp_path / "work-copy"
+    backend = codex_backend(cfg, home)
+    backend.call("author", "p", SCHEMA, ["read", "edit", "write"], workdir=work)
+    backend.call("author", "p", SCHEMA, ["read", "edit", "write"])
+    backend.call("researcher", "p", SCHEMA, RESEARCH, workdir=work)
+    with_work, without, reading = [c["argv"] for c in fakes.calls("codex")]
+    assert flag(with_work, "--sandbox") == "workspace-write"
+    assert flag(with_work, "--add-dir") == str(work)
+    # Without a work copy, or without a writing tool, nothing is writable (9.4).
+    for argv in (without, reading):
+        assert flag(argv, "--sandbox") == "read-only"
+        assert "--add-dir" not in argv
 
 
 def test_codex_on_lmstudio_gets_the_same_filtered_tools(cfg, home, fakes):

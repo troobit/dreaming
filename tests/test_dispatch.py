@@ -43,7 +43,7 @@ class Scripted:
         self.release_date = release_date
         self.prompts = []
 
-    def call(self, role, prompt, schema, tools, session_id=None):
+    def call(self, role, prompt, schema, tools, session_id=None, workdir=None):
         self.prompts.append(prompt)
         item = self.script.pop(0) if self.script else {"value": len(self.prompts)}
         if isinstance(item, BaseException):

@@ -123,6 +123,10 @@
 | Q118 | 2026-11-15 | `knowledge.export` refuses with `run_unfinished` while any dream is running, waiting or interrupted | An unfinished dream's revisions are not retained (Q114), and leaving them out would leave patterns and evidence it created pointing at rows the export omits |
 | Q119 | 2026-11-15 | An import adds rows whose key the store lacks and leaves existing rows alone; imported runs, evidence, items and learning are marked `imported`, imported evidence never counts as support, imported items keep their stated status without being judged again, and imported runs are left out of run records and `dream status` | 14.3 import into a fresh store; merging diverging stores is a non-goal; the marker is not exported, so export after import equals the original export |
 | Q120 | 2026-11-15 | `dream api` adds the codes `invalid_request`, `unknown_op`, `stale_version`, `rejected`, `run_unfinished` and `invalid_export`, exits with the error's exit code after writing the response, and recalls at most 1000 estimated tokens by default | Callers need to tell a bad request, an older server and a moved item apart; a small default limit per the design |
+| Q121 | 2026-11-15 | A change citing a session observation is replayed when it edits a skill, rule, `CLAUDE.md` or `AGENTS.md` (on opening prompts), or the lenses or a role prompt of the instruction repository (`instructions.repo`); the same `instructions/` paths in another repository are ordinary files | Lenses and role prompts are dreaming's own (7.1); elsewhere those paths mean nothing to a dream (9.16) |
+| Q122 | 2026-11-15 | A session's opening prompt is its first user entry; the session is not replayable when it has none, the entry has no text, or any block of it is marked `truncated`, `missing` or `incomplete`. The with-change run's only instruction is the text of the change's edited files at its commit | The markers of 3.4; Codex exec streams record no prompt (3.2); the replayer sees only the instruction under replay (4.4) |
+| Q123 | 2026-11-15 | An `unclear` judgement without the change does not count the session as replayed; with the change it counts as recurrence. Replay calls that fell back to another backend hold the change | 9.16 counts a session only when the problem recurs without the change, and asks for one backend; 9.17's unclear rule is about the with-change result |
+| Q124 | 2026-11-15 | A replay runs only after the cheaper adoption conditions pass (auto-apply on, checks configured, no 9.19 or 16.3 hold), needs remaining tokens for twice the estimated size of its prompts, and keys each call by change and session under the Adopt step | A replay cannot unhold a branch already held; 9.17 asks for the budget test before spending; stored answers make a resumed step replay once per authoring (9.16) |
 
 ---
 
@@ -661,3 +665,37 @@ Exit 5 then means "stopped short of the plan for a reason outside the budget", w
 - Exit codes differ from screw for budget exhaustion.
 - Reset-time parsing depends on message formats that vary by harness version; unrecognised forms fall back to transport failure.
 
+---
+
+## Decision 17: Role-Prompt Changes Without Stored Inputs Are Held
+
+**Date**: 2026-11-15
+**Status**: accepted
+
+### Context
+
+Requirement 9.16 re-runs the role a lens or role-prompt change belongs to on the stored inputs of its earlier calls. The store keeps what a Read step needs to rebuild its reader prompts: the session reference in `steps.input_ref` and the session itself through apsis. It keeps no other role's prompt. The `calls` table holds raw outputs and the sessions an input contained, and reviewer, researcher and author prompts are built from store state that later runs change.
+
+### Decision
+
+A change to the lenses or the reader's prompt re-runs the reader on the latest finished Read step of each replayed session, under that step's run scope, once with the run's instructions and once with the changed files. A change to any other role prompt (reviewer, researcher, author, replayer or judge) is held because that role's earlier inputs are not kept, and its branch stays unmerged (9.17).
+
+### Rationale
+
+Holding treats an unreplayable change the way 9.17 treats one with too few replayable sessions. Rebuilding another role's input from the current store would replay inputs its calls never saw, so a pass would say nothing about the change.
+
+### Alternatives Considered
+
+- **Store every call's prompt**: Any role could be re-run - Rejected for now: needs a schema change and roughly doubles the store, since reader prompts carry session text; it remains possible later as an additive migration.
+- **Rebuild other roles' inputs from the current store**: No new storage - Rejected: the reviewer's and author's inputs depend on state that later runs changed, so the replay would test different inputs.
+- **Let checks alone gate other role prompts**: Lowest friction - Rejected: Decision 12 gates instruction changes on behaviour because lint and test cannot see a prompt's effect.
+
+### Consequences
+
+**Positive:**
+- No change to a prompt that cannot be replayed is auto-applied.
+- No schema change.
+
+**Negative:**
+- Changes to the reviewer, researcher, author, replayer and judge prompts always wait for the user's merge, with the reason in the report.
+- Only the reader's prompt and the lenses benefit from replay among dreaming's own instructions.

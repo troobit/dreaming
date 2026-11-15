@@ -9,7 +9,7 @@ from dreamkit import EMPTY_REVIEW, ScriptedModel, build_config, instructions
 from runkit import FakeClock, add_run, git, make_runner, step_states
 from sessiondocs import add_observation
 
-from dreaming import author, knowledge, research, review
+from dreaming import adopt, author, knowledge, research, review
 from dreaming.errors import Rejected
 from dreaming.steps import NewStep
 
@@ -438,6 +438,7 @@ def test_the_author_gets_evidence_research_files_and_instruction_files(
         "default_branch": "main",
         "revision": head(repos["agentic"]),
         "public": False,
+        "work_copy": str(home / "work" / RUN / "agentic"),
     }
     assert data["instruction_files"] == {
         "AGENTS.md": "Run make check before committing.\n",
@@ -638,7 +639,7 @@ def test_depends_on_defines_linked_groups(db, cfg, run_id):
     add("ch-3", "apsis", ["orbit"])
     add("ch-4", "notes")
     add("ch-5", "agentic")
-    assert author.linked_groups(db, RUN) == [
+    assert adopt.linked_groups(db, RUN) == [
         ["agentic", "apsis", "orbit", "screw"],
         ["notes"],
     ]
@@ -803,6 +804,7 @@ def test_a_review_candidate_is_researched_then_authored(db, cfg, home, run_id):
             "review": review.ReviewPhase(found),
             "research": research.ResearchPhase(found),
             "author": author.AuthorPhase(found),
+            "adopt": adopt.AdoptPhase(),
         },
         model=ScriptedModel(answer),
         clock=FakeClock(),
@@ -810,5 +812,8 @@ def test_a_review_candidate_is_researched_then_authored(db, cfg, home, run_id):
     )
     assert runner.execute() == "complete"
     (row,) = changes(db)
-    assert (row["status"], row["external_input"]) == ("proposed", 1)
-    assert set(step_states(db, RUN).values()) == {"done"}
+    assert (row["status"], row["external_input"]) == ("waiting", 1)
+    assert row["reason"] == "auto-apply is disabled"
+    states = step_states(db, RUN)
+    assert set(states.values()) == {"done"}
+    assert {"adopt", "adopt:agentic"} <= set(states)

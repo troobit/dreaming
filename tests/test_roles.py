@@ -327,7 +327,7 @@ def walk(schema, path="$"):
 
 
 def test_the_shipped_instruction_set_has_every_role(shipped):
-    assert set(shipped.roles) == set(config.ROLES)
+    assert set(shipped.roles) == {*config.ROLES, roles.JUDGE}
     for role in shipped.roles.values():
         assert role.instructions.strip()
         assert role.schema["type"] == "object"
@@ -343,7 +343,7 @@ def test_initial_lenses_cover_every_item_in_7_2(shipped):
         assert lens.look_for.strip()
 
 
-@pytest.mark.parametrize("role", config.ROLES)
+@pytest.mark.parametrize("role", [*config.ROLES, roles.JUDGE])
 def test_schemas_are_accepted_by_strict_structured_output(shipped, role):
     """Codex's `--output-schema` and LM Studio use strict JSON Schema: every object
     closed with all its properties required, and no length or count keywords;

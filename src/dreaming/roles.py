@@ -94,6 +94,9 @@ def _schema(path: Path) -> dict:
     return schema
 
 
+JUDGE = "judge"
+
+
 def load(root: Path, cfg: dict) -> InstructionSet:
     """The instruction set under `root`, a run snapshot's `instructions/`, with
     each role's tools from the configuration."""
@@ -106,6 +109,13 @@ def load(root: Path, cfg: dict) -> InstructionSet:
         )
         for name in config.ROLES
     }
+    # The replay judge is a reviewer-role call with a prompt of its own (9.16).
+    found[JUDGE] = Role(
+        JUDGE,
+        _read(root / "roles" / f"{JUDGE}.md"),
+        _schema(root / "schemas" / f"{JUDGE}.json"),
+        (),
+    )
     lenses_path = root / "lenses.toml"
     _read(lenses_path)
     return InstructionSet(found, config.load_lenses(lenses_path))

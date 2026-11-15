@@ -1,9 +1,10 @@
-"""`dream api`: versioned, machine-readable operations (14.1-14.3, 14.5-14.7).
+"""`dream api`: versioned, machine-readable operations (14.1-14.8).
 
 One JSON request on stdin, one JSON response on stdout. Every message carries
 `{"dreaming_api": 1, "op": ...}`; a response adds `ok` and, on error, a stable
 `code` with the message. Nothing here needs an agentic-coding checkout, an
-interactive harness or a browser (14.4). The knowledge operations take no lock:
+interactive harness or a browser (14.4). `dream.start`, `dream.resume` and
+`dream.discard` take the dream lock; every other operation takes none, and
 SQLite's WAL mode covers their writes while a dream runs.
 
 Retrieval returns retained revisions only; a running dream's revisions are
@@ -21,9 +22,10 @@ import json
 import sqlite3
 from collections.abc import Callable, Mapping
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import IO
 
-from dreaming import config, exchange, knowledge, store
+from dreaming import config, exchange, knowledge, run, sessions, store
 from dreaming.backends import estimate_tokens
 from dreaming.errors import SUCCESS, USAGE_ERROR, DreamingError, Rejected
 
@@ -537,15 +539,156 @@ def import_(conn: sqlite3.Connection, cfg: dict, request: Mapping, now) -> dict:
     return exchange.import_(conn, request.get("export"))
 
 
+# Dreams (1.1, 1.6, 5.4, 14.1)
+
+SELECTION_KEYS = ("since", "until", "project", "reread", "scope")
+DREAM_SCOPE_KEYS = ("project", "workflow")
+
+
+def _object(request: Mapping, key: str) -> dict:
+    value = request.get(key, {})
+    if not isinstance(value, dict):
+        raise _invalid(f"{key} must be an object")
+    return value
+
+
+def _selection(request: Mapping) -> dict:
+    """Which sessions a new dream reads (1.3, 1.4, 2.8); empty is the default."""
+    selection = _object(request, "selection")
+    unknown = sorted(set(selection) - set(SELECTION_KEYS))
+    if unknown:
+        raise _invalid(
+            f"selection takes {', '.join(SELECTION_KEYS)}, not {', '.join(unknown)}"
+        )
+    for key in ("since", "until"):
+        value = selection.get(key)
+        if value is not None and (
+            not isinstance(value, str) or sessions.parse_time(value) is None
+        ):
+            raise _invalid(f"selection.{key} must be an ISO 8601 date")
+    if "project" in selection:
+        _text(selection, "project")
+    _flag(selection, "reread")
+    scope = selection.get("scope")
+    if scope is not None:
+        if (
+            not isinstance(scope, dict)
+            or not scope
+            or set(scope) - set(DREAM_SCOPE_KEYS)
+            or not all(isinstance(v, str) and v for v in scope.values())
+        ):
+            raise _invalid(
+                "a dream's scope is an object with a project or workflow",
+                "invalid_scope",
+            )
+    return selection
+
+
+def _started(started: run.Started) -> dict:
+    return {
+        "run_id": started.run_id,
+        "resumed": started.resumed,
+        "selection": started.selection,
+        "overrides": started.overrides,
+    }
+
+
+def dream_start(conn: sqlite3.Connection, cfg: dict, request: Mapping, now) -> dict:
+    """Start a dream in a detached process that keeps running when the caller
+    goes away, or resume the interrupted one (1.1, 1.6)."""
+    started = run.start(
+        config.dreaming_home(),
+        cfg,
+        selection=_selection(request),
+        overrides=_object(request, "overrides"),
+        requester=_text(request, "requester", required=False) or "user",
+    )
+    return _started(started)
+
+
+def dream_resume(conn: sqlite3.Connection, cfg: dict, request: Mapping, now) -> dict:
+    """Resume the interrupted dream; only backend choices may change (5.4)."""
+    started = run.start(
+        config.dreaming_home(),
+        cfg,
+        overrides=_object(request, "overrides"),
+        resume=True,
+        run_id=_text(request, "run_id", required=False),
+    )
+    return _started(started)
+
+
+def dream_status(conn: sqlite3.Connection, cfg: dict, request: Mapping, now) -> dict:
+    return run.status(conn, _text(request, "run_id", required=False))
+
+
+def dream_discard(conn: sqlite3.Connection, cfg: dict, request: Mapping, now) -> dict:
+    return run.discard(config.dreaming_home(), _text(request, "run_id", required=False))
+
+
+def dream_report(conn: sqlite3.Connection, cfg: dict, request: Mapping, now) -> dict:
+    """Where a dream's report is, once it has been written (10.1)."""
+    row = run.find_run(conn, _text(request, "run_id", required=False))
+    path = row["report_path"]
+    if not path or not Path(path).is_file():
+        raise DreamingError(
+            f"dream {row['id']} has no report yet", USAGE_ERROR, "not_found"
+        )
+    return {"run_id": row["id"], "status": row["status"], "report": path}
+
+
+# Sessions (2.10, 2.11, 14.8)
+
+
+def session_register(
+    conn: sqlite3.Connection, cfg: dict, request: Mapping, now
+) -> dict:
+    registered = request.get("sessions")
+    if not isinstance(registered, list) or not registered:
+        raise _invalid("sessions must be a non-empty list")
+    results = sessions.register_sessions(
+        conn,
+        _text(request, "tool"),
+        _text(request, "run_ref"),
+        registered,
+        now=now,
+    )
+    return {"sessions": results}
+
+
+def session_forget(conn: sqlite3.Connection, cfg: dict, request: Mapping, now) -> dict:
+    return knowledge.forget_session(
+        conn,
+        _text(request, "session_id"),
+        _text(request, "source", required=False),
+    )
+
+
+def session_restore(conn: sqlite3.Connection, cfg: dict, request: Mapping, now) -> dict:
+    return knowledge.restore_session(
+        conn,
+        _text(request, "session_id"),
+        _text(request, "source", required=False),
+    )
+
+
 # Requests and responses
 
 OPS: dict[str, Callable[[sqlite3.Connection, dict, Mapping, datetime], dict]] = {
+    "dream.start": dream_start,
+    "dream.status": dream_status,
+    "dream.resume": dream_resume,
+    "dream.discard": dream_discard,
+    "dream.report": dream_report,
     "knowledge.recall": recall,
     "knowledge.search": search,
     "knowledge.get": get,
     "knowledge.feedback": feedback,
     "knowledge.export": export,
     "knowledge.import": import_,
+    "session.register": session_register,
+    "session.forget": session_forget,
+    "session.restore": session_restore,
 }
 
 
@@ -556,6 +699,7 @@ def _error(op: object, exc: DreamingError) -> tuple[dict, int]:
         "ok": False,
         "code": exc.code,
         "error": exc.message,
+        **exc.details,
     }
     return response, exc.exit_code
 

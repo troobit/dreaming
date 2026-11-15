@@ -338,62 +338,62 @@ references:
 
 ## Adoption
 
-- [ ] 22. Run and session operations <!-- id:w1na5er -->
+- [x] 22. Run and session operations <!-- id:w1na5er -->
   - Blocked-by: w1na5di (Attribution, registration and forgetting), w1na5dl (Steps, calls, budget, lock and resume), w1na5dr (Versioned installs and launcher)
   - Stream: 1
   - Requirements: [1.1](requirements.md#1.1), [1.6](requirements.md#1.6), [2.10](requirements.md#2.10), [2.11](requirements.md#2.11), [5.4](requirements.md#5.4), [14.1](requirements.md#14.1), [14.8](requirements.md#14.8)
-  - [ ] 22.1. Write tests for start, status, resume, discard, register, forget and restore <!-- id:w1na5es -->
+  - [x] 22.1. Write tests for start, status, resume, discard, register, forget and restore <!-- id:w1na5es -->
     - start returns a run id and keeps running after the client disconnects (the child holds the lock the parent took); status shows `waiting` with the reset time and the fallback option notice; requester recorded (default `user`); resume rejects overrides other than backends and re-checks re-eligible backends; discard removes unmerged branches, worktrees and the run's rows, keeps a discarded run row and refuses with the 9.15 commands after any merge; register and forget idempotent; unknown ids return not_found
     - Blocked-by: w1na5di (Attribution, registration and forgetting), w1na5dl (Steps, calls, budget, lock and resume), w1na5dr (Versioned installs and launcher)
     - Stream: 1
     - Requirements: [1.1](requirements.md#1.1), [1.6](requirements.md#1.6), [5.4](requirements.md#5.4), [14.1](requirements.md#14.1), [14.8](requirements.md#14.8)
-  - [ ] 22.2. Implement run and session operations in api.py and cli.py <!-- id:w1na5et -->
+  - [x] 22.2. Implement run and session operations in api.py and cli.py <!-- id:w1na5et -->
     - Detached child inherits the flock from the start parent through `pass_fds` in a new session, the parent closes its copy after inserting the run row; stable codes incompatible_version, not_found, already_running, invalid_scope
     - Blocked-by: w1na5es (Write tests for start, status, resume, discard, register, forget and restore)
     - Stream: 1
     - Requirements: [1.1](requirements.md#1.1), [1.6](requirements.md#1.6), [14.1](requirements.md#14.1)
 
-- [ ] 23. Dream branch, commits and public-repository scan <!-- id:w1na5eu -->
+- [x] 23. Dream branch, commits and public-repository scan <!-- id:w1na5eu -->
   - Blocked-by: w1na5el (Researcher and author phases)
   - Stream: 1
   - Requirements: [9.1](requirements.md#9.1), [9.2](requirements.md#9.2), [9.3](requirements.md#9.3), [9.4](requirements.md#9.4), [9.5](requirements.md#9.5), [9.12](requirements.md#9.12)
-  - [ ] 23.1. Write tests for worktree branches, commits and the public scan using temporary git repositories <!-- id:w1na5ev -->
+  - [x] 23.1. Write tests for worktree branches, commits and the public scan using temporary git repositories <!-- id:w1na5ev -->
     - One branch per repository named by dream from the current default branch; the user checkout untouched; one commit per change citing evidence ids; generate commands run before the commit; files written only to configured target repositories; public scan blocks transcript text over the length limit not already in the repo, credentials and listed names, saves a patch outside every repository and lists the change as withheld; commit messages scanned too
     - Blocked-by: w1na5el (Researcher and author phases)
     - Stream: 1
     - Requirements: [9.1](requirements.md#9.1), [9.2](requirements.md#9.2), [9.4](requirements.md#9.4), [9.5](requirements.md#9.5), [9.12](requirements.md#9.12)
-  - [ ] 23.2. Implement adopt.py branch and commit steps and scan.py <!-- id:w1na5ew -->
+  - [x] 23.2. Implement adopt.py branch and commit steps and scan.py <!-- id:w1na5ew -->
     - Work copies under ~/.dreaming/work/<run>/<repo>, removed at run end with branches kept; evidence cited by identifier only in public repositories
     - Blocked-by: w1na5ev (Write tests for worktree branches, commits and the public scan using temporary git repositories)
     - Stream: 1
     - Requirements: [9.1](requirements.md#9.1), [9.2](requirements.md#9.2), [9.5](requirements.md#9.5), [9.12](requirements.md#9.12)
 
-- [ ] 24. Checks, fast-forward merge, deploy and rollback <!-- id:w1na5ex -->
+- [x] 24. Checks, fast-forward merge, deploy and rollback <!-- id:w1na5ex -->
   - Blocked-by: w1na5eu (Dream branch, commits and public-repository scan)
   - Stream: 1
   - Requirements: [9.6](requirements.md#9.6), [9.7](requirements.md#9.7), [9.8](requirements.md#9.8), [9.9](requirements.md#9.9), [9.10](requirements.md#9.10), [9.11](requirements.md#9.11), [9.13](requirements.md#9.13), [9.14](requirements.md#9.14), [9.15](requirements.md#9.15), [10.2](requirements.md#10.2)
-  - [ ] 24.1. Write tests for checks, merge, deploy, rollback and resumption <!-- id:w1na5ey -->
+  - [x] 24.1. Write tests for checks, merge, deploy, rollback and resumption <!-- id:w1na5ey -->
     - Checks run on the merge result in a separate worktree with that result's Makefiles and tests; no configured lint/test blocks; dirty checkout, non-default branch or moved HEAD blocks with the condition named; `merge --ff-only <tested-sha>`; merging and deploying rows precede the steps and state is recovered from git (merge-base --is-ancestor); deploy failure reverts with `git revert -m 1` and a Dreaming-Revert trailer, redeploys, reports both outcomes; linked groups preflighted and rolled back together; later dream skips a repository merged but not deployed; revert detection stores rejected, trailered reverts store failed; resume after a first merge makes no further merges and prints finish and undo commands; one held change keeps the whole branch unmerged
     - Blocked-by: w1na5eu (Dream branch, commits and public-repository scan)
     - Stream: 1
     - Requirements: [9.6](requirements.md#9.6), [9.7](requirements.md#9.7), [9.8](requirements.md#9.8), [9.9](requirements.md#9.9), [9.10](requirements.md#9.10), [9.11](requirements.md#9.11), [9.13](requirements.md#9.13), [9.14](requirements.md#9.14), [9.15](requirements.md#9.15)
-  - [ ] 24.2. Implement the Adopt step in adopt.py <!-- id:w1na5ez -->
+  - [x] 24.2. Implement the Adopt step in adopt.py <!-- id:w1na5ez -->
     - Adds the report's changes, applied state and merge/revert commands section and its test, extending the report from task 29
     - Limits are checked only between adoption steps; adoption continues after budget exhaustion because it makes no model calls; report commands for unapplied and applied changes include generate then deploy
     - Blocked-by: w1na5ey (Write tests for checks, merge, deploy, rollback and resumption), w1na5fc (Dream report)
     - Stream: 1
     - Requirements: [9.7](requirements.md#9.7), [9.9](requirements.md#9.9), [9.10](requirements.md#9.10), [9.15](requirements.md#9.15), [10.2](requirements.md#10.2)
 
-- [ ] 25. Replay gate and fetched-content rule <!-- id:w1na5f0 -->
+- [x] 25. Replay gate and fetched-content rule <!-- id:w1na5f0 -->
   - Blocked-by: w1na5ex (Checks, fast-forward merge, deploy and rollback), w1na5dx (Claude Code and Codex harness adapters)
   - Stream: 1
   - Requirements: [4.2](requirements.md#4.2), [4.4](requirements.md#4.4), [9.16](requirements.md#9.16), [9.17](requirements.md#9.17), [9.18](requirements.md#9.18), [9.19](requirements.md#9.19)
-  - [ ] 25.1. Write tests for the replay gate <!-- id:w1na5f1 -->
+  - [x] 25.1. Write tests for the replay gate <!-- id:w1na5f1 -->
     - A change that does nothing does not pass (with-change run still recurs); a session counts only if the problem recurs without the change; unclear counts as recurrence; sessions without a complete opening prompt and forgotten sessions never replayed; lens and role-prompt changes re-run the role on stored inputs; held by recurrence share, too few replayable sessions or budget; once per authoring; file-finding-only changes skip replay; `external_input` changes never enter merge; replay tokens counted in the budget
     - Blocked-by: w1na5ex (Checks, fast-forward merge, deploy and rollback), w1na5dx (Claude Code and Codex harness adapters)
     - Stream: 1
     - Requirements: [9.16](requirements.md#9.16), [9.17](requirements.md#9.17), [9.18](requirements.md#9.18), [9.19](requirements.md#9.19)
-  - [ ] 25.2. Implement the replay step before checks <!-- id:w1na5f2 -->
+  - [x] 25.2. Implement the replay step before checks <!-- id:w1na5f2 -->
     - Replayer runs tool-free with only the changed instruction; a reviewer-role call judges; results stored in replays and shown as association
     - Blocked-by: w1na5f1 (Write tests for the replay gate)
     - Stream: 1
@@ -450,16 +450,16 @@ references:
 
 ## Integration
 
-- [ ] 29. Dream report <!-- id:w1na5fc -->
+- [x] 29. Dream report <!-- id:w1na5fc -->
   - Blocked-by: w1na5dl (Steps, calls, budget, lock and resume), w1na5ei (Reviewer phase)
   - Stream: 2
   - Requirements: [7.4](requirements.md#7.4), [9.11](requirements.md#9.11), [10.1](requirements.md#10.1), [10.2](requirements.md#10.2), [10.3](requirements.md#10.3), [10.4](requirements.md#10.4), [10.5](requirements.md#10.5), [10.6](requirements.md#10.6), [12.3](requirements.md#12.3), [15.2](requirements.md#15.2), [16.2](requirements.md#16.2)
-  - [ ] 29.1. Write tests for the HTML report <!-- id:w1na5fd -->
+  - [x] 29.1. Write tests for the HTML report <!-- id:w1na5fd -->
     - MVP scope: until tasks 24, 27 and 28 land, the report covers statistics, knowledge revisions and learning recommendations, and the changes, effect and tooling inventory sections render an empty state; those tasks add and test their own sections. Written outside every repository in the exit path of complete, partial, budget-exhausted and failed runs; per-repository changes with evidence, applied state and merge or revert commands each followed by generate and deploy; statistics, tooling inventory, unmerged earlier branches, forgotten sessions, currency notes and changes, config and restriction changes; retained knowledge, learning recommendations and repository changes distinguished; browser opened only for user-initiated runs and a browser failure never fails the dream; fetched titles escaped and only http(s) links rendered
     - Blocked-by: w1na5dl (Steps, calls, budget, lock and resume), w1na5ei (Reviewer phase)
     - Stream: 2
     - Requirements: [10.1](requirements.md#10.1), [10.2](requirements.md#10.2), [10.3](requirements.md#10.3), [10.4](requirements.md#10.4), [10.6](requirements.md#10.6), [16.2](requirements.md#16.2)
-  - [ ] 29.2. Implement report/ <!-- id:w1na5fe -->
+  - [x] 29.2. Implement report/ <!-- id:w1na5fe -->
     - CSS and page shell vendored once from the review_html module in agentic-coding scripts/ (layout and styling per 10.5) with source revision and licence recorded in the module header; no import from agentic-coding and no runtime dependency on its checkout
     - Blocked-by: w1na5fd (Write tests for the HTML report)
     - Stream: 2

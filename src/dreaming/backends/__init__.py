@@ -56,7 +56,11 @@ class Backend(Protocol):
         schema: dict,
         tools: list[str],
         session_id: str | None = None,
-    ) -> CallResult: ...
+        workdir: Path | None = None,
+    ) -> CallResult:
+        """`workdir` is the only directory the call's file tools may write: the
+        author's work copy (9.1, 9.4). Without one, a call that has writing
+        tools gets no directory outside its own working directory."""
 
 
 class BackendError(Exception):
@@ -104,6 +108,10 @@ def estimate_tokens(*texts: str) -> int:
     """`ceil(utf8 bytes / 4)`, the estimate used when a harness omits usage and
     for sizing inputs."""
     return -(-sum(len(text.encode()) for text in texts) // 4)
+
+
+# Tools that change files; a call gets them only for its work copy (9.4).
+WRITE_TOOLS = ("edit", "write")
 
 
 # Processes

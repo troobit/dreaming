@@ -120,6 +120,7 @@ class LMStudioBackend:
         schema: dict,
         tools: list[str],
         session_id: str | None = None,
+        workdir: Path | None = None,
     ) -> CallResult:
         if tools:
             raise DreamingError(

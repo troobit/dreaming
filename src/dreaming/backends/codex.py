@@ -10,6 +10,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from dreaming.backends import (
+    WRITE_TOOLS,
     BackendError,
     CallResult,
     call_dir,
@@ -19,7 +20,6 @@ from dreaming.backends import (
 )
 
 AGENT_TOOLS = ("spawn_agent",)
-WRITE_TOOLS = ("edit", "write")
 
 # Options that suppress user configuration Codex would otherwise put in context.
 # The user's MCP servers are replaced by `mcp_servers=...` on every command.
@@ -88,6 +88,7 @@ def exec_command(
     schema_path: Path | None,
     servers: dict | None = None,
     sandbox: str = "read-only",
+    writable: Path | None = None,
 ) -> list[str]:
     """The `codex exec --json` command line; the prompt is sent on stdin. Codex
     never asks for approval, so no prompt can block a call."""
@@ -107,6 +108,8 @@ def exec_command(
         'approval_policy="never"',
         *provider_args(backend),
     ]
+    if writable is not None:
+        argv += ["--add-dir", str(writable)]
     if schema_path is not None:
         argv += ["--output-schema", str(schema_path)]
     return [*argv, "-"]
@@ -222,6 +225,7 @@ class CodexBackend:
         schema: dict,
         tools: list[str],
         session_id: str | None = None,
+        workdir: Path | None = None,
     ) -> CallResult:
         # Streams sit where apsis reads Codex exec streams (`runs/`, 5.8).
         streams = self.home / "runs" / self.run_id / "codex"
@@ -233,13 +237,16 @@ class CodexBackend:
         env = dict(os.environ)
         if self.isolation == "isolated-home":
             env["CODEX_HOME"] = str(isolated_home(self.home))
-        writes = any(tool in WRITE_TOOLS for tool in tools)
+        # Writing is sandboxed to the call's directory and the work copy; a
+        # call without a work copy writes nothing (9.1, 9.4).
+        writes = workdir is not None and any(tool in WRITE_TOOLS for tool in tools)
         argv = exec_command(
             self.entry,
             cwd=cwd,
             schema_path=schema_path,
             servers=mcp.codex_config(self.servers, tools),
             sandbox="workspace-write" if writes else "read-only",
+            writable=workdir if writes else None,
         )
         timeout = self.cfg["thresholds"]["call_timeout_seconds"]
         proc = run_process(

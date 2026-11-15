@@ -259,7 +259,7 @@ def evidence_input_ref(conn: sqlite3.Connection, evidence_ids: Sequence[str]) ->
     return call_input_ref([dict(row) for row in rows])
 
 
-def _forgotten(conn: sqlite3.Connection, copies: Sequence[Mapping]) -> bool:
+def is_forgotten(conn: sqlite3.Connection, copies: Sequence[Mapping]) -> bool:
     """Whether any copy of the session is forgotten now (2.11)."""
     for copy in copies:
         row = conn.execute(
@@ -330,36 +330,19 @@ class ReadPhase:
         keys = tuple(dict.fromkeys(step.key for step in planned))
         return [*planned, NewStep(REVIEW_KEY, "review", depends_on=keys)]
 
-    def _open(self, ref: dict) -> sessions.SessionDocument:
-        if ref["source"] == sessions.FILE_SOURCE:
-            return sessions.read_session_file(Path(ref["id"]))
-        return self.apsis.session(ref["source"], ref["id"])
-
     def prepare(self, ctx: Context, step: Step) -> ReadResult:
         ref = json.loads(step.input_ref)
         if "skipped" in ref:
             return ReadResult(ref, skipped=ref["skipped"])
-        if _forgotten(ctx.conn, ref["copies"]):
+        if is_forgotten(ctx.conn, ref["copies"]):
             return ReadResult(ref, forgotten=True)
         try:
-            document = self._open(ref)
+            document = open_session(self.apsis, ref["source"], ref["id"])
         except DreamingError as exc:
             return ReadResult(ref, skipped=exc.message)
-        attribution = dict(ref["attribution"])
-        attribution["quote_entries"] = frozenset(attribution["quote_entries"])
-        session = sessions.SelectedSession(
-            source=ref["source"],
-            id=ref["id"],
-            document=document,
-            copies=[sessions.ListingRow(**row) for row in ref["copies"]],
-            start=ref["start"],
-            attribution=sessions.Attribution(**attribution),
-        )
+        session = selected_session(ref, document)
         scope = run_request(ctx.conn, ctx.run_id).scope
-        lenses = roles.reader_lenses(
-            sessions.scope_lenses(self.instructions.lenses, scope, ctx.cfg),
-            session.attribution,
-        )
+        lenses = session_lenses(self.instructions, ctx.cfg, scope, session)
         result = ReadResult(
             ref,
             session,
@@ -374,7 +357,7 @@ class ReadPhase:
         entries = source_entries(session)
         for number, (info, part) in enumerate(parts, start=1):
             # Forgetting takes effect before the next call (2.11).
-            if number > 1 and _forgotten(ctx.conn, ref["copies"]):
+            if number > 1 and is_forgotten(ctx.conn, ref["copies"]):
                 return ReadResult(ref, forgotten=True)
             data = roles.reader_input(info, lenses, part)
             output = ctx.call(
@@ -440,6 +423,60 @@ class ReadPhase:
             sessions.Skipped(ref["source"], ref["id"], reason),
             state="failed",
         )
+
+
+def open_session(
+    apsis: sessions.Apsis, source: str, session_id: str
+) -> sessions.SessionDocument:
+    """A session's document, from apsis or a registered file (14.8)."""
+    if source == sessions.FILE_SOURCE:
+        return sessions.read_session_file(Path(session_id))
+    return apsis.session(source, session_id)
+
+
+def selected_session(
+    ref: Mapping, document: sessions.SessionDocument
+) -> sessions.SelectedSession:
+    """A Read step's session from its stored `input_ref` and the document."""
+    attribution = dict(ref["attribution"])
+    attribution["quote_entries"] = frozenset(attribution["quote_entries"])
+    return sessions.SelectedSession(
+        source=ref["source"],
+        id=ref["id"],
+        document=document,
+        copies=[sessions.ListingRow(**row) for row in ref["copies"]],
+        start=ref["start"],
+        attribution=sessions.Attribution(**attribution),
+    )
+
+
+def session_lenses(
+    instructions: roles.InstructionSet,
+    cfg: dict,
+    scope: sessions.Scope | None,
+    session: sessions.SelectedSession,
+) -> list[config.Lens]:
+    return roles.reader_lenses(
+        sessions.scope_lenses(instructions.lenses, scope, cfg), session.attribution
+    )
+
+
+def reader_prompts(
+    instructions: roles.InstructionSet,
+    cfg: dict,
+    scope: sessions.Scope | None,
+    session: sessions.SelectedSession,
+) -> list[str]:
+    """The reader's prompt for each part of a session, as the Read step makes
+    them; a replay re-runs the reader on them (9.16)."""
+    lenses = session_lenses(instructions, cfg, scope, session)
+    if not lenses:
+        return []
+    reader = instructions.roles["reader"]
+    return [
+        reader.prompt(roles.reader_input(info, lenses, part))
+        for info, part in split(cfg, reader, session, lenses)
+    ]
 
 
 def run_request(conn: sqlite3.Connection, run_id: str) -> sessions.SelectionRequest:

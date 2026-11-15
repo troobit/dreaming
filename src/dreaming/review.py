@@ -19,7 +19,7 @@ from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import date
 
-from dreaming import budget, config, knowledge, roles, sessions, steps
+from dreaming import adopt, budget, config, knowledge, roles, sessions, steps
 from dreaming.errors import Rejected
 from dreaming.observe import evidence_input_ref, normalise_key, run_request
 from dreaming.run import Context, Outcome
@@ -272,6 +272,9 @@ class ReviewPhase:
 
     def prepare(self, ctx: Context, step: Step) -> Reviewed:
         conn, cfg, run_id = ctx.conn, ctx.cfg, ctx.run_id
+        # Changes the user has reverted since an earlier dream applied them are
+        # rejected before the reviewer sees each pattern's changes (9.13).
+        adopt.detect_reverts(conn, cfg)
         today = ctx.clock.now().date()
         scope = run_request(conn, run_id).scope
         lenses = {lens.id: lens for lens in self.instructions.lenses}
@@ -797,14 +800,14 @@ class _Applier:
                 planned.append(NewStep(key, "research", input_ref=question_id))
             if candidate_id is not None:
                 research.setdefault(candidate_id, []).append(key)
+        authors = []
         for candidate_id in accepted.values():
             keys = tuple(dict.fromkeys(research.get(candidate_id, ())))
+            authors.append(f"author:{candidate_id}")
             planned.append(
-                NewStep(
-                    f"author:{candidate_id}",
-                    "author",
-                    depends_on=keys,
-                    input_ref=candidate_id,
-                )
+                NewStep(authors[-1], "author", depends_on=keys, input_ref=candidate_id)
             )
+        if authors:
+            # Adoption plans its linked groups once every change is authored.
+            planned.append(NewStep(adopt.PLAN_KEY, "adopt", depends_on=tuple(authors)))
         return planned

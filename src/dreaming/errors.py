@@ -15,14 +15,20 @@ PARTIAL = 5
 
 
 class DreamingError(Exception):
-    """An error with a process exit code and a stable code for `dream api`."""
+    """An error with a process exit code and a stable code for `dream api`;
+    `details` adds machine-readable fields to the error response."""
 
     def __init__(
-        self, message: str, exit_code: int = FAILURE, code: str = "error"
+        self,
+        message: str,
+        exit_code: int = FAILURE,
+        code: str = "error",
+        details: dict | None = None,
     ) -> None:
         self.message = message
         self.exit_code = exit_code
         self.code = code
+        self.details = details or {}
         super().__init__(message)
 
 

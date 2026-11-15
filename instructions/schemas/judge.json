@@ -1,0 +1,32 @@
+{
+  "type": "object",
+  "properties": {
+    "without": {
+      "type": "string",
+      "enum": [
+        "recurs",
+        "resolved",
+        "unclear"
+      ],
+      "description": "Whether the problem recurs in the answer without the change."
+    },
+    "with": {
+      "type": "string",
+      "enum": [
+        "recurs",
+        "resolved",
+        "unclear"
+      ],
+      "description": "Whether the problem recurs in the answer with the change."
+    },
+    "reason": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "without",
+    "with",
+    "reason"
+  ],
+  "additionalProperties": false
+}
