@@ -67,7 +67,8 @@ class RunBudget:
             "JOIN steps t ON t.run_id=c.run_id AND t.key=c.task_key "
             "LEFT JOIN session_inputs i ON i.call_id=c.id "
             "LEFT JOIN sessions_seen s ON s.source=i.source AND s.session_id=i.session_id "
-            "WHERE c.run_id=? AND c.role='reader' AND c.outcome='success' AND t.state='done'",
+            "WHERE c.run_id=? AND c.role='reader' AND c.outcome='success' "
+            "AND t.state='done' AND t.phase='Read'",
             (self.run_id,),
         )
         return {
@@ -89,7 +90,14 @@ class RunBudget:
         self, role: str, *, key: str | None = None, sessions: tuple[tuple[str, str], ...] = ()
     ) -> bool:
         ceiling = self.limits.max_tokens
-        if role == "reader":
+        phase = (
+            self.store.connection.execute(
+                "SELECT phase FROM steps WHERE run_id=? AND key=?", (self.run_id, key)
+            ).fetchone()
+            if key is not None
+            else None
+        )
+        if role == "reader" and (phase is None or phase[0] == "Read"):
             ceiling *= 1 - self.limits.reserve_share
             if key is not None and self.read_limit_reached(key, sessions):
                 return False

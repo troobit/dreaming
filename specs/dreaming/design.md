@@ -292,6 +292,23 @@ Exit codes follow screw except for budget exhaustion: 0 success (including `budg
 
 ## Risks and Assumptions
 
+- Adoption portability (2026-11-15): run/session operations use the existing
+  POSIX lock handoff and immutable snapshots. Commands are configured shell
+  strings executed in their selected worktree with closed file descriptors.
+  Git adoption builds and checks an actual merge commit, then fast-forwards the
+  user checkout only if its branch, cleanliness and recorded HEAD still match.
+  Each side effect is recorded before execution; a resumed run after a possible
+  merge produces manual recovery commands instead of further deployment.
+  Replay uses tool-free isolated backends and recorded complete prompts or role
+  inputs; missing inputs hold the change. Task 29 is implemented as the report
+  prerequisite of the Adoption phase. Its upstream shell/CSS source is
+  agentic-coding revision `5d07d2f7f31675709f57b35579f72058e846fa67`, whose
+  inspected tree declares no licence; source attribution records that fact.
+  Replay conservatively covers Markdown, MDC and rule files. Mixed affected
+  roles hold the change; a role-input replay requires a complete stored request
+  envelope. Paired calls use one backend and the separate judge follows the
+  reviewer's configured backend list. The judgement schema is a
+  fixed replay protocol in `replay.py`, used with the snapshotted reviewer prompt.
 - API-phase portability (2026-11-15): Research and Author use the existing
   dispatcher and snapshot roles. Author returns validated delta edits to the
   private store; worktrees, commits and adoption remain tasks 23–25. Until that

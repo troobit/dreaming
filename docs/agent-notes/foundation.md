@@ -37,12 +37,13 @@
   `spawn_agent` in a read-only `debug prompt-input` check with the proposed
   suppression flags. Treat this as a failed isolation probe, not proof that a
   flag works. Authenticated model-call probes remain opt-in.
-- Current public CLI commands are `--version`, `api`, `probe`, `run --dry-run`,
-  `status [--plan]` and `trial reader --backend NAME --sessions N`. Complete
-  dream execution has later tasks. `api` exposes knowledge operations with
+- Current public CLI commands include `start`, `resume`, `discard`, `register`,
+  `forget`, `restore`, `status [--plan]`, `api`, `probe`, `run --dry-run` and
+  `trial reader --backend NAME --sessions N`. `api` exposes knowledge and run/session operations with
   versioned JSON and opens read requests through a read-only snapshot. Backend adapters,
   direct tool-free LM Studio probing/calls, role definitions, versioned
   installation and the bootstrap launcher are available as library operations.
+  Migration 5 adds a durable replay disposition per change and authoring.
 
 Use Makefile targets for checks. `make test` includes isolated wheel installation
 and import of packaged SQL/schema resources. `make test-live` makes real model

@@ -160,6 +160,7 @@ class RunSession:
         backend_overrides: dict | None = None,
         steps: tuple[Step, ...] = (),
         requester: str = "user",
+        allow_new: bool = True,
     ) -> RunRecord:
         old = inspect_run(self.lock.home, unfinished=True)
         if old:
@@ -189,6 +190,8 @@ class RunSession:
             ).fetchone()
             kill_survivors(old["process_group"])
             if active.exhausted() and not adopted:
+                if not allow_new:
+                    raise ConfigError("Run budget is exhausted; start a new dream")
                 self.store.connection.execute(
                     "UPDATE runs SET status='budget_exhausted',ended_at=? WHERE id=?",
                     (datetime.now(UTC).isoformat(), old["id"]),

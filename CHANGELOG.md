@@ -8,6 +8,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- Detached `dream start` and `resume`, guarded discard, and versioned run/session API operations with registration, forgetting and restoration.
+- Private dream branches with evidence commits, generated files, public-output scans and withheld patches; checked merge commits, linked adoption, deployment rollback and Git-based recovery.
+- Paired instruction replays with live evidence checks, counted model calls, saved-output recovery and one durable result per authoring; fetched-content changes remain on their branches.
+- Self-contained HTML reports with retained knowledge, learning recommendations, run statistics, replay results and ordered merge, revert, generate and deploy commands.
 - Versioned `dream api` knowledge recall, search, get, feedback, export and import, with scoped token-bounded retrieval, quoted evidence, revision history and portable exclusion markers.
 - Resumable Research and Author handlers with source citations, live evidence preflight, counted repository instructions, validated delta edits, linked change dependencies and separate learning recommendations.
 - Imported-evidence provenance, model-free preflight deferrals, recovery checks outside database write transactions and installed-wheel API validation.
@@ -35,5 +39,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- Reader reserves and session caps apply to reading steps; role-input replays use the remaining total budget. Explicit resume cannot silently create another run after budget exhaustion.
+- Target repository paths resolve relative to configuration, and discarded sessions become eligible for rereading after their evidence is removed.
 - Dreaming exit codes: reaching the run's own budget ends as `budget_exhausted` with exit 0; exit 5 is reserved for `partial` runs. Wait time on a usage limit does not count toward wall-clock (requirements 1.2, 5.3).
 - Dreaming tasks 2, 3, 8, 11 and 22 updated for the `waiting` run status, `max_usage_wait`, lock behaviour, exit-code mapping and the usage-limit classifier.

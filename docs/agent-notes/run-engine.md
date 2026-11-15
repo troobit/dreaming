@@ -19,8 +19,9 @@
   `Dispatcher` owns each attempt's call rows and shares the engine's budget and
   interrupt flag. Its handler `prepare` returns role, prompt, schema, tools,
   optional lineage and a checkpoint callback. The callback verifies reader
-  quotes before redaction and persistence. Read/Review/Research/Author handlers
-  are available; public dream start/resume wiring remains in task 22.
+  quotes before redaction and persistence. `operations.work` wires the public
+  detached start/resume path, restores source references and schedules Adopt
+  after Review's Research/Author follow-ups in the same transaction.
   Handlers with `resize` receive the smallest live fallback context; a reduced
   model context resizes the pending input before retrying.
 - `StepDeferred` records a preflight reason without making a model call. A
@@ -32,7 +33,10 @@
   last checkpoint. Readers preserve reserved tokens and a distinct-session cap;
   split parts use explicit input lineage to avoid counting one session twice.
   Interrupts are checked between steps. The finalizer makes no model calls;
-  styled report generation is supplied by the report phase.
+  the public worker finalizer writes the styled report on every exit path.
+  Explicit resume uses `allow_new=False`, so an exhausted run cannot create an
+  unintended replacement run. Automatic start can begin a new bounded dream.
+  Dispatcher calls retain redacted complete request envelopes for role replay.
 - Dry planning uses committed lenses and an in-memory store snapshot; only
   executable `--version` checks and existing probe caches are consulted. The
   rune plan is a replaceable view of steps, never execution input.

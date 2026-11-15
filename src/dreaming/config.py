@@ -381,6 +381,14 @@ def load_config(path: Path | None = None, *, overrides: dict | None = None) -> C
     repos = _table(raw.get("repositories", {}), "repositories")
     for name, repo in repos.items():
         _table(repo, f"repositories.{name}")
+        if "path" in repo:
+            repo["path"] = str(path_setting(repo["path"]))
+        if "default_branch" in repo and (
+            not isinstance(repo["default_branch"], str)
+            or not repo["default_branch"]
+            or repo["default_branch"].startswith("-")
+        ):
+            raise ConfigError(f"Invalid repositories.{name}.default_branch")
         for command in ("generate", "lint", "test", "deploy"):
             _strings(repo.get(command, []), f"repositories.{name}.{command}")
         if type(repo.get("public", False)) is not bool:

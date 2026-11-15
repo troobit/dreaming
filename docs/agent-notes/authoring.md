@@ -17,7 +17,8 @@
   ambiguous preimages, path escapes, symlinks and dependency cycles.
 - `change_id(run_id, author_key)` lets an author cite planned changes before
   their proposals have been saved. `linked_groups` computes dependency components
-  for later adoption. Branches, commits, checks and replay belong to tasks 23–25.
+  for adoption. `adopt.py` consumes stored deltas into private worktrees; checks,
+  replay and group adoption run outside the Engine's application transaction.
 - Research permitted web/PR tools is conservatively external input because the
   current adapter does not expose durable tool-result telemetry. That flag and
   cited web sources propagate to changes and cannot be cleared by author output.

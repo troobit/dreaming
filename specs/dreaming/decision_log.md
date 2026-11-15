@@ -617,3 +617,100 @@ Exit 5 then means "stopped short of the plan for a reason outside the budget", w
 - Exit codes differ from screw for budget exhaustion.
 - Reset-time parsing depends on message formats that vary by harness version; unrecognised forms fall back to transport failure.
 
+
+---
+
+## Decision 17: Durable Adoption Intents and Complete Replay Inputs
+
+**ID**: 17
+**Date**: 2026-11-15
+**Status**: accepted
+
+### Context
+
+The Adoption phase exposes the detached engine through the public API. Git,
+deployment commands and SQLite cannot share a transaction. Replay needs the
+complete original role request; previous call lineage held identifiers but no
+request envelope. Task 24 requires the report supplied by task 29.
+
+### Decision
+
+Complete task 29 as the phase's prerequisite. Build each merge commit in a
+private worktree, test it there and fast-forward the user checkout to that exact
+commit after rechecking branch, cleanliness and HEAD. Persist intents before Git
+and deploy operations; reconcile a possibly completed merge through Git ancestry.
+A resumed run after a merge intent reports finish and undo commands without
+further automatic merges or deployments. Store redacted complete role request
+envelopes with calls and cache each authoring's replay disposition separately.
+Discard resets selected sessions' read cursors so deleted evidence can be read
+again; existing evidence uniqueness constraints prevent duplicate observations.
+
+### Rationale
+
+The tested tree is the deployed tree, interrupted effects can be inspected, and
+replay uses recorded input rather than reconstructing a different model request.
+A conservative reread avoids discarding evidence while keeping its cursor past it.
+
+### Alternatives Considered
+
+- **Merge in the user's checkout and check afterward**: rejected because failed
+  checks would already have changed the user's active files.
+- **Trust the last database state after interruption**: rejected because the
+  process can die between a Git side effect and the next database write.
+- **Reconstruct replay inputs from summaries**: rejected because the baseline
+  would no longer represent the original input and could falsely pass.
+
+### Consequences
+
+**Positive:**
+- Checks, merges, rollback and manual recovery refer to concrete Git commits.
+- Completed replay calls and terminal outcomes survive recovery without new answers.
+
+**Negative:**
+- Cross-repository adoption remains recoverable rather than atomic.
+- Older calls without complete envelopes cannot support role-input replay.
+- Discard can reread more session entries than were originally selected.
+
+---
+
+## Decision 18: Preserve the Report Source's Actual Licence Status
+
+**ID**: 18
+**Date**: 2026-11-15
+**Status**: accepted
+
+### Context
+
+The design requires the report shell and CSS from the user's agentic-coding
+checkout. Revision `5d07d2f7f31675709f57b35579f72058e846fa67` contains that
+source but declares no licence in its tracked tree.
+
+### Decision
+
+Vendor the requested shell and CSS with their source paths, exact revision,
+modifications and the statement that no upstream licence was declared in
+`report/UPSTREAM.txt` and the module header. Keep the runtime independent of that
+checkout. Update these resources and their attribution together when refreshing.
+
+### Rationale
+
+This preserves the requested appearance and reports the inspected source facts
+without assigning an unsupported licence to the user's source.
+
+### Alternatives Considered
+
+- **Label the source MIT because nearby projects use MIT**: rejected because no
+  licence grant for these files was found.
+- **Import the source from the external checkout at runtime**: rejected because
+  installation must work without that checkout.
+
+### Consequences
+
+**Positive:**
+- Reports retain their requested appearance and package their provenance.
+- Installed reports require no external source tree or network resources.
+
+**Negative:**
+- No upstream licence grant is represented; redistribution requires resolving
+  that source's licensing separately.
+- Styling updates require an explicit vendored-source refresh.

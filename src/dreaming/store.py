@@ -31,6 +31,7 @@ MIGRATIONS = (
     Migration(2, files("dreaming").joinpath("session_migration.sql").read_text()),
     Migration(3, files("dreaming").joinpath("observation_migration.sql").read_text()),
     Migration(4, files("dreaming").joinpath("phase_migration.sql").read_text()),
+    Migration(5, files("dreaming").joinpath("adoption_migration.sql").read_text()),
 )
 UNFINISHED = ("running", "waiting", "interrupted", "partial")
 

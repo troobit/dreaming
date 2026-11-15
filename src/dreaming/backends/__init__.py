@@ -15,6 +15,7 @@ from jsonschema import ValidationError, validate
 from dreaming.backends.probe import ProbeResult
 from dreaming.budget import RunBudget
 from dreaming.config import Config
+from dreaming.redact import redact
 from dreaming.sessions import SessionError
 from dreaming.steps import CallResult, Steps
 from dreaming.store import Store
@@ -164,6 +165,13 @@ class Dispatcher:
         input_ref: str | None = None,
         checkpoint=None,
     ) -> CallResult:
+        if input_ref is None:
+            input_ref = redact(
+                json.dumps(
+                    {"role": role, "prompt": prompt, "schema": schema, "tools": tools},
+                    sort_keys=True,
+                )
+            )
         # An answer saved before a crash is reapplied, never regenerated.
         saved = self.steps.saved_output(key)
         if saved is not None:

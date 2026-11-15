@@ -24,7 +24,8 @@ from dreaming.knowledge import (
 )
 from dreaming.observe import canonical
 from dreaming.redact import redact
-from dreaming.sessions import _timestamp
+from dreaming.run import AlreadyRunning
+from dreaming.sessions import SessionError, _timestamp
 from dreaming.store import Store
 
 STATUSES = {"candidate", "active", "contested", "superseded", "dismissed"}
@@ -414,7 +415,31 @@ def handle_request(store: Store, config: Config, request: dict) -> dict:
             or request["dreaming_api"] != 1
         ):
             raise APIError("incompatible_version", "Expected dreaming_api version 1")
-        if op in {"knowledge.recall", "knowledge.search"}:
+        if isinstance(op, str) and op.startswith("dream."):
+            from dreaming.operations import lifecycle
+
+            result = lifecycle(config, request, home=store.path.parent if store else None)
+        elif op == "session.register":
+            from pathlib import Path
+
+            from dreaming.sessions import register_session
+
+            fields = {k: v for k, v in request.items() if k not in {"dreaming_api", "op"}}
+            if fields.get("document_path"):
+                fields["document_path"] = Path(fields["document_path"])
+            result = {"changed": register_session(store, **fields)}
+        elif op in {"session.forget", "session.restore"}:
+            from dreaming.knowledge import forget_session, restore_session
+
+            callback = forget_session if op == "session.forget" else restore_session
+            result = {
+                "changed": callback(
+                    store,
+                    _required_text(request.get("source"), "source"),
+                    _required_text(request.get("session_id"), "session_id"),
+                )
+            }
+        elif op in {"knowledge.recall", "knowledge.search"}:
             result = _retrieve(store, config, request)
         elif op == "knowledge.get":
             result = _get(store, request)
@@ -428,6 +453,10 @@ def handle_request(store: Store, config: Config, request: dict) -> dict:
             raise APIError("unknown_operation", f"Unknown operation {op}")
         return {**response, "ok": True, **result}
     except APIError as exc:
+        return {**response, "ok": False, "code": exc.code, "message": str(exc)}
+    except AlreadyRunning as exc:
+        return {**response, "ok": False, "code": "already_running", "message": str(exc)}
+    except SessionError as exc:
         return {**response, "ok": False, "code": exc.code, "message": str(exc)}
     except (ValueError, TypeError, KeyError, sqlite3.IntegrityError) as exc:
         code = "invalid_scope" if str(exc) == "invalid_scope" else "invalid_request"

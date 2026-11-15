@@ -27,9 +27,18 @@ def _api_main(config_path):
             result = handle_request(None, None, request)
         else:
             config = load_config(config_path)
-            writable = request.get("op") in ("knowledge.feedback", "knowledge.import")
-            with Store(home_path()) if writable else Store.readonly(home_path()) as store:
-                result = handle_request(store, config, request)
+            if isinstance(request.get("op"), str) and request["op"].startswith("dream."):
+                result = handle_request(None, config, request)
+            else:
+                writable = request.get("op") in (
+                    "knowledge.feedback",
+                    "knowledge.import",
+                    "session.register",
+                    "session.forget",
+                    "session.restore",
+                )
+                with Store(home_path()) if writable else Store.readonly(home_path()) as store:
+                    result = handle_request(store, config, request)
     except (ValueError, StoreError, sqlite3.Error, OSError) as exc:
         code = "invalid_request"
         if isinstance(exc, MigrationBlocked):
@@ -46,7 +55,7 @@ def _api_main(config_path):
             "message": str(exc),
         }
     print(json.dumps(result))
-    return 0 if result["ok"] else 2
+    return 0 if result["ok"] else 4 if result.get("code") == "already_running" else 2
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -66,6 +75,38 @@ def main(argv: list[str] | None = None) -> int:
     run.add_argument("--since")
     run.add_argument("--until")
     run.add_argument("--reread", action="store_true")
+    start = commands.add_parser("start", help="Start or resume a detached dream")
+    for name in ("project", "workflow", "domain", "since", "until"):
+        start.add_argument("--" + name)
+    start.add_argument("--reread", action="store_true")
+    start.add_argument("--dry-run", action="store_true")
+    start.add_argument("--requester", default="user")
+    start.add_argument("--backends", type=json.loads)
+    start.add_argument("--no-browser", action="store_true")
+    start.add_argument("--fallback-on-usage-limit", action="store_true", default=None)
+    for name in ("max-tokens", "max-sessions", "max-seconds"):
+        start.add_argument("--" + name, type=int)
+    for name in ("resume", "discard"):
+        command = commands.add_parser(name)
+        command.add_argument("run_id")
+        if name == "resume":
+            command.add_argument("--backends", type=json.loads, default={})
+    for name in ("forget", "restore"):
+        command = commands.add_parser(name)
+        command.add_argument("session_id")
+        command.add_argument("--source", required=True)
+    register = commands.add_parser("register")
+    for name in (
+        "tool",
+        "run-ref",
+        "source",
+        "session-id",
+        "correlation-id",
+        "workflow",
+        "project",
+        "document-path",
+    ):
+        register.add_argument("--" + name, required=name in {"tool", "run-ref"})
     status = commands.add_parser("status", help="Inspect a recorded run")
     status.add_argument("run_id", nargs="?")
     status.add_argument("--plan", action="store_true")
@@ -78,6 +119,40 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if args.command == "api":
             return _api_main(args.config)
+        if args.command in {"start", "resume", "discard", "forget", "restore", "register"}:
+            from dreaming.api import handle_request
+            from dreaming.store import Store
+
+            fields = {
+                k: v
+                for k, v in vars(args).items()
+                if k not in {"config", "command"} and v is not None
+            }
+            if args.command == "start":
+                fields["budget"] = {
+                    k: fields.pop(k)
+                    for k in ("max_tokens", "max_sessions", "max_seconds")
+                    if k in fields
+                }
+                if not fields["budget"]:
+                    fields.pop("budget")
+                if fields.pop("no_browser"):
+                    fields["open_browser"] = False
+                for flag in ("reread", "dry_run"):
+                    if not fields.get(flag):
+                        fields.pop(flag, None)
+            op = (
+                "session." if args.command in {"forget", "restore", "register"} else "dream."
+            ) + args.command
+            request = {"dreaming_api": 1, "op": op, **fields}
+            config = load_config(args.config)
+            if op.startswith("session."):
+                with Store(home_path()) as store:
+                    result = handle_request(store, config, request)
+            else:
+                result = handle_request(None, config, request)
+            print(json.dumps(result))
+            return 0 if result["ok"] else 4 if result.get("code") == "already_running" else 2
         if args.command == "probe":
             config = load_config(args.config)
             from dreaming.backends.probe import probe_config

@@ -1,0 +1,14 @@
+Vendored source: agentic-coding/scripts/review_html/{css.py,template.py}
+Inspected revision: 5d07d2f7f31675709f57b35579f72058e846fa67
+Source checkout used: /Users/r/repos/agentic-coding
+
+Licence: no licence declared in the inspected upstream tree. No licence grant
+or copyright statement is asserted here. These files are copied from the user's
+own source tree at the user's request. Preserve this notice when updating them;
+any redistribution needs the source owner's licence terms to be established.
+
+Boundary: CSS and the page shell only. Dreaming does not import agentic-coding
+or require its checkout at runtime. Local modifications: Dreaming attribution
+headers and a Dreaming-specific footer; all page content is supplied by the
+local report renderer. Updates are manual and should retain the source revision
+and inspect the upstream licence status again.
