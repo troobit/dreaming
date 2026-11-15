@@ -9,6 +9,7 @@ from hypothesis import strategies as st
 from sessiondocs import (
     NOW,
     StubApsis,
+    add_observation,
     add_run,
     add_seen,
     days_ago,
@@ -430,3 +431,35 @@ def test_entry_text_renders_every_block_kind():
     for expected in ("Plain.", "Musing.", "shell", '"ls"', "a.txt", "step", "boom"):
         assert expected in text
     assert "counters" not in text and "hologram" not in text
+
+
+# Source availability (13.7)
+
+
+@pytest.mark.parametrize(
+    ("before", "listed_size", "after"),
+    [
+        ("available", None, "unavailable"),  # no longer listed
+        ("changed", None, "unavailable"),
+        ("available", 50, "changed"),  # smaller than when read
+        ("unavailable", 50, "changed"),
+        ("unavailable", 100, "available"),  # listed again
+        ("available", 120, "available"),  # grown, as sessions do
+        ("changed", 120, "changed"),  # rewritten content stays marked
+    ],
+)
+def test_evidence_is_marked_by_what_became_of_its_source(
+    db, before, listed_size, after
+):
+    add_seen(db, "claude", "s1")
+    db.execute("UPDATE sessions_seen SET size_bytes = 100")
+    add_observation(db, "ev-1", "claude", "s1")
+    db.execute("UPDATE observations SET availability = ?", (before,))
+    listed = {}
+    if listed_size is not None:
+        listed[("claude", "s1")] = sessions.ListingRow(
+            "claude", "s1", size_bytes=listed_size
+        )
+    sessions.mark_availability(db, listed)
+    (row,) = db.execute("SELECT availability FROM observations").fetchall()
+    assert row["availability"] == after

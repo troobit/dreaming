@@ -28,3 +28,9 @@ Covers `sessions.py` selection/recording/registration (tasks 6, 7) and the forge
 - `item_withheld`/`change_withheld` mean the counted supporting evidence fails 4.5/13.3 now, whatever the cause. An item resting only on a hedged user statement in fewer than `min_sessions` sessions is withheld even with nothing forgotten.
 - A running dream re-checks the flag before each reader call (`observe.ReadPhase`). Reader and reviewer calls store `{"sessions": [[source, id], ...]}` as `calls.input_ref`; `_Selector` skips a dream call session whose input held a forgotten session (Q105). Other phases should use `observe.call_input_ref` for the same reason.
 - `record_skipped(..., state="failed")` records a session whose reading failed (4.7); default selection passes over `failed` rows.
+
+## Source availability (13.7, Q136)
+
+- `Selection.listed` holds every listing row and readable registered file, selected or not. `sessions.mark_availability(conn, listed)` runs in the Read planner (never in a dry run) over sessions that have observations: unlisted → `unavailable`, listing `size_bytes`/`request_count` below the recorded value → `changed`, an `unavailable` one listed again → `available`. `changed` is only replaced by `unavailable`.
+- The marker never affects counting; it is shown on evidence references in retrieval and carried by export/import.
+- After an import, the new store's next dream marks imported evidence `unavailable` unless its own apsis lists those sessions.

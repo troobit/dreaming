@@ -4,15 +4,17 @@ Task 29: the `report/` package, `tests/test_report.py`, helpers in `tests/report
 
 ## How it is built
 
-- `report.Writer(home, cfg)` matches `run.Report` (`(conn, run_id)`): `write`, then `open_report` with the run's `requester`. Not wired: task 31 passes `report=report.Writer(home, cfg)` in `run.child_main`, where home and config are known.
-- `write` renders, writes `<home>/reports/<run-id>.html` (dir mode 0700), sets `runs.report_path` (autocommit), returns the path. `config.ensure_home` already refuses a home inside a repository; the writer does not re-check.
+- `report.Writer(home, cfg)` matches `run.Report` (`(conn, run_id)`): `write`, then `open_report` with the run's `requester`. `run.wiring` passes it to the child's runner.
+- `write` records the run's tooling inventory (`inventory.record`), renders, writes `<home>/reports/<run-id>.html` (dir mode 0700), sets `runs.report_path` (autocommit), returns the path. `render` alone reads only the store. `config.ensure_home` already refuses a home inside a repository; the writer does not re-check.
 - `render` reads only the store, so it can be re-run; an unknown run raises `not_found`.
 - `open_report` opens `path.as_uri()` only for requester `user` with `report.open_browser` on; exceptions and a False return are printed (child stdout is `runs/<id>/run.log`), never raised. The browser opens from the detached child, since `dream run` without `--wait` has already exited.
 
 ## Sections (`report/sections.py`)
 
-- `SECTIONS` = ordered `(anchor, heading, body)`; body `(conn, run_row, cfg) -> str`; `""` drops the section and its TOC entry. Always shown: statistics, knowledge, learning, changes, effect, inventory, unmerged, config-changes. Only when non-empty: candidates, research, currency, forgotten.
-- Task 27 replaces `effect`; task 28 replaces `inventory`. The changes section is task 24's (see `adoption.md`).
+- `SECTIONS` = ordered `(anchor, heading, body)`; body `(conn, run_row, cfg) -> str`; `""` drops the section and its TOC entry. Always shown: statistics, outcomes, knowledge, learning, changes, effect, inventory, unmerged, config-changes. Only when non-empty: sources, candidates, research, forgotten; currency also for every currency run.
+- `outcomes` and `effect` come from `effect.py` (`effect-measurement.md`); `inventory` renders `runs.inventory` (`inventory.md`) and shows an empty state when none was recorded. The changes section is task 24's (see `adoption.md`).
+- `sections.py` imports `effect as effects` and `inventory as tooling`, because the section functions have the modules' names.
+- `sources` ("Sources and integrations", Q137): `unavailable_integrations` lists backends whose latest probe call in the run (`role = 'probe'`, by rowid) is `unavailable`, configured knowledge folders that do not exist now, and `mcp.unavailable_tools(cfg)`; then `runs.selection_notes` (unmapped domains and origins, listing and server warnings). With default config and no `mcp.servers_file`, the researcher's devtools tools always appear here, which is accurate.
 - Table cells are escaped unless wrapped in `sections.Html`. `source_link` renders `<a>` only for http/https schemes (per `urlsplit`) and uses `geturl()` as href; other links are shown as text.
 
 ## Where the numbers come from
@@ -33,5 +35,4 @@ Task 29: the `report/` package, `tests/test_report.py`, helpers in `tests/report
 
 ## Not done
 
-- Selection warnings and unmapped domains/origins are not stored; the planner must persist them for the report to show them.
 - 7.4 suggestions for external configuration have no store field.

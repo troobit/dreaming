@@ -127,6 +127,20 @@
 | Q122 | 2026-11-15 | A session's opening prompt is its first user entry; the session is not replayable when it has none, the entry has no text, or any block of it is marked `truncated`, `missing` or `incomplete`. The with-change run's only instruction is the text of the change's edited files at its commit | The markers of 3.4; Codex exec streams record no prompt (3.2); the replayer sees only the instruction under replay (4.4) |
 | Q123 | 2026-11-15 | An `unclear` judgement without the change does not count the session as replayed; with the change it counts as recurrence. Replay calls that fell back to another backend hold the change | 9.16 counts a session only when the problem recurs without the change, and asks for one backend; 9.17's unclear rule is about the with-change result |
 | Q124 | 2026-11-15 | A replay runs only after the cheaper adoption conditions pass (auto-apply on, checks configured, no 9.19 or 16.3 hold), needs remaining tokens for twice the estimated size of its prompts, and keys each call by change and session under the Adopt step | A replay cannot unhold a branch already held; 9.17 asks for the budget test before spending; stored answers make a resumed step replay once per authoring (9.16) |
+| Q125 | 2026-11-15 | Currency targets are `<repository>:<path>` entries in `currency.targets`, one Research step each; `dream run --currency` and `dream.start` with `kind: "currency"` start one, take no selection, and the dry run lists the targets instead of sessions | 16.1 names configured targets; a path inside a configured repository is what the researcher reads and the author edits |
+| Q126 | 2026-11-15 | Store v7 adds `fetched_pages`, `currency_findings.assessment`, `candidates.currency_finding_id`, `sessions_seen.inventory` and `runs.inventory` | Currency review, the tooling inventory and the report need them; all are additive |
+| Q127 | 2026-11-15 | A registrable domain is the host's last two labels (an IP literal as it is), with no public suffix list; knowledge-folder notes count as one source between them; two passages share when either contains the other after whitespace and case are normalised | Never counts one domain twice, so it errs toward fewer independent sources (16.3); Q77 keeps the package free of runtime dependencies |
+| Q128 | 2026-11-15 | A currency finding's id hashes its target and normalised claim unless the researcher names an equivalent finding for the same target; an already proposed finding is not kept again; a dismissed one returns only with a source on a domain it did not cite; a change whose branch is gone and whose commit is not in the default branch is `rejected` and its finding `dismissed` | 16.6; a hand merge followed by deleting the branch is not a rejection |
+| Q129 | 2026-11-15 | Currency candidates are `candidates` rows with a `currency_finding_id` and no pattern, authored by the Author step with the finding as their only evidence; a deferred or discarded one becomes a currency note; the Adopt step waits for the Author steps research adds through `steps.wait_for` | Reuses authoring, commits and the public scan (9.x); 16.4 keeps what cannot be a change as a note |
+| Q130 | 2026-11-15 | Currency notes are scoped to their target repository's path, returned by recall and search only with `include: ["currency_note"]` and by `knowledge.get` by id, with confidence `low` | 16.4 and 15.2: returned only when asked for and never mistaken for knowledge about the user |
+| Q131 | 2026-11-15 | Effect periods are split by session start, with each observation placed by its session's start; a reverted change's after period ends at the revert; evidence is insufficient for file-only changes, a zero-session or zero-observation baseline, or fewer than `min_sessions_for_rate` sessions on either side; re-candidacy (11.2) measures the latest applied unreverted change, which ends the interim rule of Q104 | One clock for both counts keeps the rate meaningful; the design handoff asked for the insufficient cases |
+| Q132 | 2026-11-15 | Outcomes by stage (11.6) are counted from the store for the report and added to the run records the reviewer gets, with candidate and change reasons but no step reasons | Step reasons can name sessions (2.11); candidate and change reasons do not |
+| Q133 | 2026-11-15 | The Read step records each session's tool and skill use and first-request context in `sessions_seen.inventory`; `report.write` records the run's inventory on `runs.inventory` before rendering; each harness's MCP, instruction and skill files are fixed paths in `inventory.HARNESS_FILES`; an MCP tool is recognised by Claude Code's `mcp__<server>__<tool>` name | The Read step already has the document open; the report keeps rendering from the store only |
+| Q134 | 2026-11-15 | Context weight per harness and model shows its heaviest session: measured from the first usage record's input tokens (which include the first prompt), else estimated from the session's system text and first request's tool schemas, else from instruction files and skill front matter; tool schemas are unavailable otherwise; a known window is the context of a configured backend with the same model | Only Codex exec streams carry usage and only LM Studio logs carry schemas (apsis 4bf9776); 8.2 asks for labels rather than guesses |
+| Q135 | 2026-11-16 | An MCP tool whose server the shared definitions lack, or whose definitions file is unset or missing, is left out of the role's calls and listed in the report; an unreadable or malformed definitions file is still a configuration error | 14.4: the default researcher tools name devtools, so failing the call stopped every dream outside agentic-coding at its first research question |
+| Q136 | 2026-11-16 | The Read planner marks each session's evidence `unavailable` when the listing (with registered files) no longer holds it, `changed` when its listing size or request count is below what was read, and `available` again when an unavailable session is listed once more; `changed` is cleared only by the session disappearing | 13.7; sessions only grow, so a smaller one was rewritten, and its quotes no longer match by location |
+| Q137 | 2026-11-16 | The planner stores unmapped domains and origins and listing and server warnings on `runs.selection_notes` (store v8); the report's "Sources and integrations" section shows them with backends whose latest probe in the run failed, configured knowledge folders that do not exist and the MCP tools of Q135 | 2.3, 2.4 and 2.9 ask the report to list them, and 14.4 to report unavailable integrations; the report renders from the store only |
+| Q138 | 2026-11-16 | The `dream` skill uses only `dream run` (with `--dry-run`, `--repo`, `--workflow`), `status`, `resume`, `report --open` and `dream api`; `--repo` and `--project` paths are taken from the caller's directory, and `report --open` opens the page whatever `report.open_browser` says | The detached run works in its home, so `--repo .` must be resolved by the caller; opening on request is the user asking (10.1) |
 
 ---
 
@@ -699,3 +713,38 @@ Holding treats an unreplayable change the way 9.17 treats one with too few repla
 **Negative:**
 - Changes to the reviewer, researcher, author, replayer and judge prompts always wait for the user's merge, with the reason in the report.
 - Only the reader's prompt and the lenses benefit from replay among dreaming's own instructions.
+
+---
+
+## Decision 18: The Program Fetches the Pages a Currency Finding Cites
+
+**Date**: 2026-11-15
+**Status**: accepted
+
+### Context
+
+Requirement 16.3 asks the program to verify each relied-on passage verbatim against the stored fetched text. The researcher fetches pages through its own harness tools, which the program does not see: the harness keeps the tool results in its transcript, and the researcher's answer gives only the title, link, date and the passage it relied on.
+
+### Decision
+
+After the researcher answers, the program reads every source a finding cites itself: an http or https page with a plain HTTP GET (skipping hosts that are not public addresses), or a note inside a configured knowledge folder. It stores what it read in `fetched_pages` with the title, link and retrieval date, and checks each passage against that copy. A source it cannot read is listed and skipped; a passage missing from the copy rejects the finding. `max_sources` bounds the pages fetched per run.
+
+### Rationale
+
+The program then holds the text it verified against, so verification does not depend on how a harness records tool results, and a model cannot report a passage that the page does not contain. Every backend is treated alike.
+
+### Alternatives Considered
+
+- **Read fetched text from the researcher's transcript through apsis**: no second fetch - Rejected: transcripts differ by harness, Codex exec streams record tool output in their own form, and a direct LM Studio log truncates bodies.
+- **Have the researcher return each page's text in its answer**: no network access in the program - Rejected: the model could return text the page does not hold, which defeats the check, and pages would inflate the answer past its schema's purpose.
+
+### Consequences
+
+**Positive:**
+- Verification works the same on every backend, against a stored copy the report can point to.
+- Fetched text never reaches a role except as the passages inside the author's data block.
+
+**Negative:**
+- Each cited page is fetched twice, once by the researcher and once by the program; a page that changes in between can reject a finding.
+- Pages that need a login or JavaScript are unreadable to the program and are listed as skipped.
+

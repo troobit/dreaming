@@ -9,8 +9,8 @@ import pytest
 from runkit import CallPhase, FakeClock, add_run, reads
 
 from dreaming import config, run
-from dreaming.backends import BackendError, claude, codex, lmstudio, probe
-from dreaming.errors import USAGE_ERROR, DreamingError
+from dreaming.backends import BackendError, claude, codex, lmstudio, mcp, probe
+from dreaming.errors import DreamingError
 
 DEVTOOLS_EXTRA = ("sequential_thinking", "gemini-agent", "codex-agent")
 SERVERS = {
@@ -274,11 +274,40 @@ def test_an_environment_secret_codex_cannot_forward_is_a_config_error(
     assert "SEARCH_API_KEY" in excinfo.value.message
 
 
-def test_a_tool_on_an_undefined_server_is_a_config_error(cfg, home, fakes):
-    with pytest.raises(DreamingError) as excinfo:
-        claude_backend(cfg, home).call("researcher", "p", SCHEMA, ["azure.search"])
-    assert excinfo.value.exit_code == USAGE_ERROR
-    assert "azure" in excinfo.value.message
+@pytest.mark.parametrize("servers_file", ["defined", "missing", "unset"])
+def test_calls_go_on_without_tools_the_shared_definitions_lack(
+    make_cfg, tmp_path, home, fakes, servers_file
+):
+    """The shared definitions are optional (14.4): a call leaves out a server
+    they do not define, and `unavailable_tools` names its tools for the report,
+    instead of the call failing and stopping the dream."""
+    path = {"defined": str(tmp_path / "servers.json"), "unset": ""}.get(
+        servers_file, str(tmp_path / "missing.json")
+    )
+    cfg = make_cfg(
+        mcp={"servers_file": path},
+        tools={"researcher": ["read", "devtools.internet_search", "azure.search"]},
+    )
+    claude_backend(cfg, home).call(
+        "researcher", "p", SCHEMA, cfg["tools"]["researcher"]
+    )
+    servers = json.loads(flag(only_call(fakes, "claude")["argv"], "--mcp-config"))
+    reasons = {
+        "defined": "the shared MCP definitions have no azure server",
+        "missing": f"the shared MCP definitions {path} do not exist",
+        "unset": "no shared MCP definitions are configured (mcp.servers_file)",
+    }
+    missing = [("researcher", "azure.search", reasons[servers_file])]
+    if servers_file == "defined":
+        assert list(servers["mcpServers"]) == ["devtools"]
+    else:
+        assert servers == {"mcpServers": {}}
+        missing.insert(
+            0, ("researcher", "devtools.internet_search", reasons[servers_file])
+        )
+    assert [
+        (m["role"], m["tool"], m["reason"]) for m in mcp.unavailable_tools(cfg)
+    ] == missing
 
 
 @pytest.mark.parametrize("tool", ["Agent", "Task", "bash", "devtools.codex-agent"])

@@ -27,6 +27,8 @@ from dreaming.run import Context, Outcome
 from dreaming.steps import Step
 
 LOCAL_KINDS = ("repository", "knowledge_folder")
+# A cited source as it is shown outside the step that found it.
+CITED = ("title", "link", "retrieved_on", "passage")
 
 
 def fetched(source: Mapping) -> bool:

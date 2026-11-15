@@ -17,12 +17,13 @@ from runkit import (
     fake_config,
     files,
     instruction_repo,
+    instruction_set,
     make_runner,
     reads,
     run_row,
 )
 
-from dreaming import cli, config, run, steps, store, versions
+from dreaming import cli, config, currency, replay, report, run, steps, store, versions
 from dreaming.errors import PARTIAL, SKIPPED, USAGE_ERROR, DreamingError, Partial
 
 
@@ -326,21 +327,71 @@ def test_finished_runs_are_not_resumed(home, cfg, children, status):
         _stop(started)
 
 
-def test_the_real_child_runs_the_dream_detached_and_exits_with_its_code(home, cfg):
-    started = run.start(home, cfg)
+@pytest.fixture
+def real_cfg(tmp_path, fakes):
+    """What a real child runs with: the shipped instruction set and the fake
+    apsis, which lists no session, and no browser for the report."""
+    repo = instruction_set(tmp_path)
+    return config.build_config(
+        {"instructions": {"repo": str(repo)}, "report": {"open_browser": False}}
+    )
+
+
+def test_the_real_child_runs_the_dream_detached_and_exits_with_its_code(home, real_cfg):
+    started = run.start(home, real_cfg)
     assert started.process.wait(timeout=60) == 0
     conn = store.open_store(home / "dreaming.db")
     row = run_row(conn, started.run_id)
     assert row["status"] == "complete"
     assert row["ended_at"] is not None
+    # The child planned the dream's steps and wrote its report (10.1).
+    assert [s.key for s in steps.load(conn, started.run_id)] == ["review"]
+    assert (home / "reports" / f"{started.run_id}.html").is_file()
     conn.close()
     log = (home / "runs" / started.run_id / "run.log").read_text()
     assert "complete" in log
 
 
-def test_dream_run_waits_for_the_exit_code_when_asked(home, cfg, capsys):
+@pytest.mark.parametrize("kind", ["dream", "currency"])
+def test_the_child_wires_the_phases_of_its_run_kind(home, real_cfg, kind):
+    """A currency review researches its targets and reads no sessions (16.1);
+    every phase loads the run's snapshot of the instruction set (7.3)."""
+    snapshot = config.write_snapshot(home, "dream-wired", real_cfg)
+    row = {"snapshot_path": str(snapshot), "kind": kind}
+    phases, planner, page = run.wiring(home, row, real_cfg)
+    if kind == "currency":
+        assert set(phases) == {"research", "author", "adopt"}
+        assert isinstance(phases["research"], currency.CurrencyPhase)
+        assert planner is currency.plan
+    else:
+        assert set(phases) == {"read", "review", "research", "author", "adopt"}
+        assert planner == phases["read"].plan
+    assert isinstance(phases["adopt"].replay, replay.ReplayGate)
+    assert isinstance(page, report.Writer)
+
+
+def test_a_child_that_cannot_load_its_instructions_leaves_the_run_interrupted(
+    home, cfg
+):
+    """The bare instruction repository has no role prompts; the run keeps the
+    reason and can be discarded (Q85)."""
+    conn = store.open_store(home / "dreaming.db")
+    snapshot = config.write_snapshot(home, "dream-broken", cfg)
+    run.create_run(conn, "dream-broken", cfg, snapshot_path=str(snapshot))
+    fd = run.acquire_lock(home)
+    try:
+        assert run.child_main(["dream-broken", "--lock-fd", str(fd)]) == 1
+    finally:
+        os.close(fd)
+    row = run_row(conn, "dream-broken")
+    assert row["status"] == "interrupted"
+    assert "roles/reader.md" in row["error"]
+    conn.close()
+
+
+def test_dream_run_waits_for_the_exit_code_when_asked(home, real_cfg, capsys):
     (home / "config.toml").write_text(
-        f'[instructions]\nrepo = "{cfg["instructions"]["repo"]}"\n'
+        f'[instructions]\nrepo = "{real_cfg["instructions"]["repo"]}"\n'
     )
     assert cli.main(["run", "--wait", "--requester", "screw"]) == 0
     out = capsys.readouterr().out

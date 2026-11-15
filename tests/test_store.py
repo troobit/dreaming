@@ -27,6 +27,7 @@ TABLES = {
     "learning",
     "replays",
     "currency_findings",
+    "fetched_pages",
 }
 
 

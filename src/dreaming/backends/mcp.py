@@ -11,6 +11,10 @@ Secrets are never written into a call's configuration. As in agentic-coding's
 generated configs, a server's secret is read from the environment variable
 `<SERVER>_<SECRET>` (for example `GITHUB_AUTH_TOKEN` for the GitHub server's
 Authorization header), referenced in each harness's own way.
+
+The shared definitions are optional (14.4): without the file, or without a
+server a role names, the role's calls go on without that server's tools, and
+the report lists them (`unavailable_tools`).
 """
 
 from __future__ import annotations
@@ -30,11 +34,14 @@ def _invalid(message: str) -> DreamingError:
 
 
 def load_servers(cfg: dict) -> dict:
-    """The shared definitions named by `mcp.servers_file`, or none."""
+    """The shared definitions named by `mcp.servers_file`, or none when it is
+    not set or does not exist."""
     raw = cfg["mcp"]["servers_file"]
     if not raw:
         return {}
     path = Path(raw).expanduser()
+    if not path.exists():
+        return {}
     try:
         servers = json.loads(path.read_text())
     except (OSError, json.JSONDecodeError) as exc:
@@ -60,18 +67,42 @@ def secret_var(server: str, secret: str) -> str:
     return f"{server}_{secret}".upper().replace("-", "_")
 
 
+def _defined(servers: dict, server: str) -> bool:
+    return isinstance((servers.get(server) or {}).get("transport"), dict)
+
+
+def unavailable_tools(cfg: dict) -> list[dict]:
+    """Each MCP tool a role lists that the shared definitions cannot supply,
+    with the reason; the role's calls go on without it (14.4)."""
+    servers = load_servers(cfg)
+    raw = cfg["mcp"]["servers_file"]
+    missing = []
+    for role, tools in cfg["tools"].items():
+        for server, names in mcp_tools(tools).items():
+            if _defined(servers, server):
+                continue
+            if not raw:
+                reason = "no shared MCP definitions are configured (mcp.servers_file)"
+            elif not Path(raw).expanduser().exists():
+                reason = f"the shared MCP definitions {raw} do not exist"
+            else:
+                reason = f"the shared MCP definitions have no {server} server"
+            missing += [
+                {"role": role, "tool": f"{server}.{name}", "reason": reason}
+                for name in names
+            ]
+    return missing
+
+
 def role_servers(servers: dict, tools: list[str]) -> dict[str, dict]:
-    """The definition of each server the role's tools name, keyed by server, with
-    devtools' optional tools cut to the role's."""
+    """The definition of each server the role's tools name that the shared
+    definitions have, keyed by server, with devtools' optional tools cut to the
+    role's."""
     chosen = {}
     for server, names in mcp_tools(tools).items():
-        definition = servers.get(server) or {}
-        if not isinstance(definition.get("transport"), dict):
-            raise _invalid(
-                f"a role uses {server}.{names[0]}, but the shared MCP definitions "
-                f"have no {server} server"
-            )
-        definition = copy.deepcopy(definition)
+        if not _defined(servers, server):
+            continue
+        definition = copy.deepcopy(servers[server])
         env = definition["transport"].get("env") or {}
         if ADDITIONAL_TOOLS in env:
             enabled = env[ADDITIONAL_TOOLS].split(",")

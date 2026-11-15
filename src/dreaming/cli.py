@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
@@ -15,6 +16,7 @@ from dreaming import (
     knowledge,
     observe,
     plan,
+    report,
     roles,
     run,
     sessions,
@@ -55,6 +57,12 @@ def _usage(message: str) -> DreamingError:
     return DreamingError(message, USAGE_ERROR, "invalid_request")
 
 
+def _path(value: str | None) -> str | None:
+    """A path from the command line, taken from the caller's directory: the
+    detached dream runs in its home, not here."""
+    return os.path.abspath(os.path.expanduser(value)) if value else None
+
+
 def _selection(args: argparse.Namespace) -> dict:
     """Which sessions to read (1.3, 1.4, 2.8); empty means the default selection."""
     selection: dict = {}
@@ -67,10 +75,10 @@ def _selection(args: argparse.Namespace) -> dict:
                 raise _usage(f"--{key} {value!r} is not an ISO 8601 date") from exc
             selection[key] = value
     if args.project:
-        selection["project"] = args.project
+        selection["project"] = _path(args.project)
     if args.reread:
         selection["reread"] = True
-    scope = {"project": args.repo, "workflow": args.workflow}
+    scope = {"project": _path(args.repo), "workflow": args.workflow}
     scope = {key: value for key, value in scope.items() if value}
     if scope:
         selection["scope"] = scope
@@ -113,8 +121,12 @@ def _describe_dry_run(result: dict) -> str:
         f"{limits['wall_clock_minutes']} wall-clock minutes, "
         f"{limits['review_author_reserve']:.0%} reserved for review and authoring"
     )
-    lines.append(f"Sessions ({len(result['sessions'])}):")
-    for s in result["sessions"]:
+    if result["kind"] == "currency":
+        lines.append(f"Currency review targets ({len(result['targets'])}):")
+        lines += [f"  {target}" for target in result["targets"]]
+    else:
+        lines.append(f"Sessions ({len(result['sessions'])}):")
+    for s in result["sessions"]:  # none for a currency review
         read = f"{s['entries']} entries"
         if s["from_entry"]:
             read += f" from entry {s['from_entry']}"
@@ -143,13 +155,18 @@ def _describe_dry_run(result: dict) -> str:
 
 
 def _run(args: argparse.Namespace) -> int:
+    kind = "currency" if args.currency else "dream"
+    selection = _selection(args)
+    if args.currency and selection:
+        raise _usage("a currency review reads no sessions; drop the selection")
     if args.dry_run:
         home = config.dreaming_home()
         result = run.dry_run(
             home,
             config.load_config(home),
-            selection=_selection(args),
+            selection=selection,
             overrides=_overrides(args),
+            kind=kind,
         )
         print(json.dumps(result, indent=2) if args.json else _describe_dry_run(result))
         return 0
@@ -158,9 +175,10 @@ def _run(args: argparse.Namespace) -> int:
     started = run.start(
         home,
         cfg,
-        selection=_selection(args),
+        selection=selection,
         overrides=_overrides(args),
         requester=args.requester,
+        kind=kind,
     )
     if started.resumed:
         print(f"resumed {started.run_id}")
@@ -249,6 +267,8 @@ def _report(args: argparse.Namespace) -> int:
     finally:
         conn.close()
     print(result["report"])
+    if args.open:
+        report.open_in_browser(Path(result["report"]))
     return 0
 
 
@@ -394,6 +414,12 @@ def _parser() -> argparse.ArgumentParser:
         help="move to the next backend at a usage limit instead of waiting",
     )
     dream.add_argument(
+        "--currency",
+        action="store_true",
+        help="review the configured currency targets against current sources; "
+        "reads no sessions",
+    )
+    dream.add_argument(
         "--requester", default="user", help="who asked for the dream (default user)"
     )
     dream.add_argument(
@@ -452,9 +478,12 @@ def _parser() -> argparse.ArgumentParser:
     )
     discard.set_defaults(handler=_discard)
 
-    report = commands.add_parser("report", help="print the path of a dream's report")
-    report.add_argument("run", nargs="?", metavar="RUN", help="default: the latest")
-    report.set_defaults(handler=_report)
+    page = commands.add_parser("report", help="print the path of a dream's report")
+    page.add_argument("run", nargs="?", metavar="RUN", help="default: the latest")
+    page.add_argument(
+        "--open", action="store_true", help="also open it in the default browser"
+    )
+    page.set_defaults(handler=_report)
 
     for name, forget, text in (
         ("forget", True, "stop counting a session and every copy of it (2.11)"),

@@ -22,9 +22,11 @@ branch = "main"
 [scan]
 names_file = "~/.config/dreaming/names.txt"   # outside every repository (9.12)
 
-# The shared MCP definitions. A call gets only the servers and tools its role
-# lists; a server's secret is read from <SERVER>_<SECRET> in the environment,
-# for example GITHUB_AUTH_TOKEN="Bearer <token>" for the GitHub server.
+# The shared MCP definitions, optional: without them, or without a server a
+# role names, calls go on without those tools and the report lists them. A
+# call gets only the servers and tools its role lists; a server's secret is
+# read from <SERVER>_<SECRET> in the environment, for example
+# GITHUB_AUTH_TOKEN="Bearer <token>" for the GitHub server.
 [mcp]
 servers_file = "~/repos/agentic-coding/mcp/servers.json"
 
@@ -80,6 +82,11 @@ non_interactive = ["sdk-cli", "sdk-ts", "sdk-py"]
 
 [domains.sources]
 lmstudio = "general"
+
+# Skills, rules and workflows that `dream run --currency` checks against current
+# sources (16.1); each is <repository>:<path>. Changes stay on the dream branch.
+[currency]
+targets = ["agentic-coding:claude/rules/language-rules/python.md"]
 
 # Target repositories for changes (9.x); no lint and test commands means proposal-only.
 [repositories.agentic-coding]

@@ -19,7 +19,7 @@ from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import date
 
-from dreaming import adopt, budget, config, knowledge, roles, sessions, steps
+from dreaming import adopt, budget, config, effect, knowledge, roles, sessions, steps
 from dreaming.errors import Rejected
 from dreaming.observe import evidence_input_ref, normalise_key, run_request
 from dreaming.run import Context, Outcome
@@ -156,8 +156,11 @@ def _items(conn: sqlite3.Connection, cfg: dict, today: date) -> dict[str, list[d
     return found
 
 
-def _changes(conn: sqlite3.Connection) -> dict[str, list[dict]]:
+def _changes(conn: sqlite3.Connection, cfg: dict) -> dict[str, list[dict]]:
+    """Each pattern's changes; an applied one carries its effect, before and
+    after it was applied, as association (11.1)."""
     found: dict[str, list[dict]] = {}
+    measure = effect.Measure(conn, cfg)
     rows = conn.execute(
         "SELECT * FROM changes WHERE pattern_id IS NOT NULL ORDER BY created_at, id"
     )
@@ -170,16 +173,22 @@ def _changes(conn: sqlite3.Connection) -> dict[str, list[dict]]:
                 "status": row["status"],
                 "applied_at": row["applied_at"],
                 "reverted_at": row["reverted_at"],
+                "effect": measure.change(row).to_dict() if row["applied_at"] else None,
             }
         )
     return found
 
 
 def pattern_status(changes: Sequence[Mapping], run_id: str) -> str:
+    """`recurring` when the latest applied change's pattern recurs at its
+    earlier rate, so it may be a candidate again (11.2)."""
     if any(c["status"] in UNMERGED and c["run"] != run_id for c in changes):
         return "unmerged_change"
-    if any(c["status"] == "applied" and not c["reverted_at"] for c in changes):
-        return "changed"
+    applied = [c for c in changes if c["status"] == "applied" and not c["reverted_at"]]
+    if applied:
+        latest = max(applied, key=lambda c: (c["applied_at"] or "", c["id"]))
+        recurring = (latest["effect"] or {}).get("recurring")
+        return "recurring" if recurring else "changed"
     if changes and changes[-1]["status"] == "rejected":
         return "change_rejected"
     return "open"
@@ -244,6 +253,7 @@ def run_records(conn: sqlite3.Connection, run_id: str) -> list[dict]:
                     "SELECT status, COUNT(*) FROM changes WHERE run = ?"
                     " GROUP BY status ORDER BY status"
                 ),
+                "outcomes": effect.stage_outcomes(conn, run),
             }
         )
     return records
@@ -315,7 +325,7 @@ class ReviewPhase:
         clusters = cluster(unassigned)
 
         items = _items(conn, cfg, today)
-        changes = _changes(conn)
+        changes = _changes(conn, cfg)
         quote_chars = cfg["thresholds"]["quote_chars"]
         renewed = set(automatic.values())
         considered = [pid for pid in patterns if members[pid] or items.get(pid)]
@@ -725,10 +735,14 @@ class _Applier:
                 "an earlier dream's change for this pattern is still unmerged on its "
                 "branch (9.14)"
             )
-        if any(c["status"] == "applied" and not c["reverted_at"] for c in changes):
+        changed = any(
+            c["status"] == "applied" and not c["reverted_at"] for c in changes
+        )
+        if changed and effect.recurs(self.conn, self.cfg, pattern_id) is None:
             raise Rejected(
                 "the pattern was changed already; it becomes a candidate again only "
-                "by recurring at its pre-change rate (11.2)"
+                "by recurring at its pre-change rate after "
+                f"{self.cfg['thresholds']['recurrence_sessions']} later sessions (11.2)"
             )
         made = [c for c in changes if c["status"] not in NO_CHANGE]
         most = self.cfg["thresholds"]["max_changes_per_pattern"]

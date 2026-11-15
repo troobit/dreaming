@@ -11,7 +11,7 @@ Tasks 15–19 of `specs/dreaming/tasks.md`: `redact.py`, `observe.py` (gate, Rea
 
 ## Read steps (`observe.ReadPhase`)
 
-- `plan(ctx)` is the run's planner: one Read step per selected session (input_ref = source, id, start, copies and attribution as JSON), one per unparseable session (input_ref carries `skipped`), then `review` depending on all of them. It is not yet installed in `run.PLANNER`; wiring belongs to task 22/31.
+- `plan(ctx)` is the run's planner: one Read step per selected session (input_ref = source, id, start, copies and attribution as JSON), one per unparseable session (input_ref carries `skipped`), then `review` depending on all of them. `run.wiring` uses it as the planner of a `dream` run. Before returning, it marks evidence availability from the listing (`sessions.mark_availability`, Q136) and stores `Selection.notes()` on `runs.selection_notes` (Q137), in one transaction.
 - `prepare` re-opens the document from apsis (or the registered file) every time, including on resume, and rebuilds `SelectedSession` from the input_ref. Parts are calls `read:<hash>#p<n>`; a crash after a call reuses the stored answer.
 - The forgotten flag is checked before the first part and before each later part; a forgotten session ends the step `skipped` with nothing stored.
 - `run.Phase` gained an optional `failed(conn, step, reason)` hook that runs in the failure transaction; the Read phase uses it to record the session `failed` (4.7), so default selection passes it over and only an explicit reread retries it.
@@ -34,14 +34,13 @@ Tasks 15–19 of `specs/dreaming/tasks.md`: `redact.py`, `observe.py` (gate, Rea
 - Existing patterns are ordered `(not due, -score, id)`; due means new evidence this run, an item pending reassessment or due for revalidation, or `boost_after_dreams` dreams since the last review. `last_reviewed_run` is set for shown and newly assigned patterns.
 - Cluster refs are `<lens>/<key>`; the reviewer uses them in `assignments`, item `pattern` and candidate `pattern`. `_Applier.resolve` maps refs and merged pattern ids to live patterns.
 - Candidate positions and signals are computed in `apply`, after assignments, from `knowledge.pattern_signals`, so new patterns rank too.
-- Follow-up steps: `research:<question id>` (input_ref = question id) and `author:<candidate id>` depending on its research steps. `run.PHASES` has no research or author handlers yet (task 20); tests stand them in with `runkit.LocalPhase`.
+- Follow-up steps: `research:<question id>` (input_ref = question id) and `author:<candidate id>` depending on its research steps. Tests stand the research and author handlers in with `runkit.LocalPhase`; a real run gets them from `run.wiring`.
 - Run records given to the reviewer are counts per earlier run (steps by phase and state, observations, rejections, candidates, changes); step reasons are left out because they can name sessions (2.11).
 
 ## Not yet done here
 
 - Items pending reassessment show their latest feedback to the reviewer (`review._feedback`, 11.7).
-- Before/after counts on earlier changes (11.1) and re-candidacy after an applied change (11.2) belong to task 27; until then a pattern with an applied change is refused as a candidate (Q104).
-- Selection warnings, unmapped domains and origins are not stored for the report; task 29 needs to capture them from the planner's `Selection`.
+- Before/after counts and re-candidacy (11.1, 11.2) live in `effect.py`; see `effect-measurement.md`. Each change in a pattern summary carries `effect` (None until applied), and `pattern_status` gives `recurring` when the latest applied change's pattern recurs.
 
 ## Tests
 

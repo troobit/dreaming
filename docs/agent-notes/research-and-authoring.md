@@ -8,7 +8,8 @@ Task 20 of `specs/dreaming/tasks.md`: `research.py` (`ResearchPhase`) and `autho
 - Missing repositories and folders are found by the program (`readable`) and stored with the model's own `unavailable` list in `questions.unavailable`; research never waits on them (4.6).
 - Findings go to `research_findings` (with `question_id`, `assessment`, `sources` JSON) and never to `observations`; `knowledge.check_evidence` refuses their ids. A finding with no source, no link or passage, or no ISO `retrieved_on` is a `finding` rejection.
 - `fetched(source)` decides `research_findings.fetched`: only `repository`/`knowledge_folder` kinds whose link is not a URL (no `://`, no `www.`) count as local. This is a heuristic on the model's output; it cannot see which tools the researcher actually called.
-- `equivalent_finding` is ignored here; reusing ids for equivalent findings is the currency dream's job (16.6, task 26).
+- `equivalent_finding` is ignored here; reusing ids for equivalent findings is the currency dream's job (16.6, `currency-review.md`).
+- `research.CITED` (title, link, retrieved_on, passage) is how a cited source is shown outside the step that found it; the author and retrieval use it for currency findings.
 
 ## Author step (`author.AuthorPhase`)
 
@@ -22,10 +23,11 @@ Task 20 of `specs/dreaming/tasks.md`: `research.py` (`ResearchPhase`) and `autho
 - A stored change is `proposed` with `evidence` = the change's ids plus every edit's supporting ids, `edits` as given, `research` = finding ids given, `base_revision`, `rank` = candidate position plus signals, and `external_input` (any given finding fetched, or author tools beyond the file tools).
 - `commit_message` appends one `Dreaming-Evidence:` trailer per evidence id; file findings add `(repo revision path location)` except in public repositories.
 - `deferred_steps` (interactive skill steps, 9.3) are stored on the candidate whatever the outcome.
+- A candidate with `currency_finding_id` goes through `_currency_input`: its only evidence is the finding (cited passages, never the stored page), `Given.currency` skips `knowledge.check_evidence` and the session threshold, and the change is stored with `currency_finding_id` and `external_input = 1`. Authoring sets the finding `proposed`; a defer or discard sets it back to `note` with `not authored: <reason>`.
 - `linked_groups(conn, run)` is union-find over the run's changes and their `depends_on`; adoption (task 24) should run one Adopt step per group.
 
 ## Gotchas
 
-- Neither phase is in `run.PHASES` yet; wiring is task 31.
-- The Claude adapter passes the configured repositories to `--add-dir`, and the author's default tools include `edit` and `write`. Until adoption (task 23) gives the author a work copy as its only writable directory, wiring the Author phase into a real run would let the model write into the user's checkouts.
+- `run.wiring` installs both phases in a real run. The author writes only in its work copy: `claude.call_dirs` gives a call with write tools no `--add-dir` but the work copy, and a learning candidate (no repository) gets none at all.
+- The default researcher tools name devtools; without shared MCP definitions the research call goes on with the file tools only (Q135).
 - `Authored` carries `cfg` because `Phase.apply` gets no context, as `review.Reviewed` does.

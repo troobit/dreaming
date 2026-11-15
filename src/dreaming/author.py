@@ -35,7 +35,7 @@ from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
 
-from dreaming import adopt, config, knowledge, roles, scan, steps
+from dreaming import adopt, config, knowledge, research, roles, scan, steps
 from dreaming.errors import Rejected
 from dreaming.observe import evidence_input_ref, verify
 from dreaming.run import Context, Outcome
@@ -69,6 +69,22 @@ class Repository:
         """A file's text at the revision, or None when there is no such file."""
         result = _git(self.path, "cat-file", "blob", f"{self.revision}:{path}")
         return result.stdout if result.returncode == 0 else None
+
+    def exists(self, path: str) -> bool:
+        """Whether a file or directory is at `path` in the revision."""
+        return (
+            _git(self.path, "cat-file", "-e", f"{self.revision}:{path}").returncode == 0
+        )
+
+    def instruction_files(self) -> dict[str, str]:
+        """The repository's own instruction files, which describe its
+        conventions (4.4)."""
+        found = {}
+        for name in INSTRUCTION_FILES:
+            text = self.read(name)
+            if text is not None:
+                found[name] = text
+        return found
 
     def view(self) -> dict:
         return {
@@ -154,6 +170,8 @@ class Given:
     research: list[str]
     fetched: bool
     repo: Repository | None
+    # The currency finding a currency candidate rests on (16.3).
+    currency: str | None = None
 
 
 @dataclass
@@ -236,6 +254,8 @@ class AuthorPhase:
     def _input(self, conn: sqlite3.Connection, cfg: dict, c: Mapping):
         """The author's input, after checking that the candidate's evidence
         still holds against the current files (11.5)."""
+        if c["currency_finding_id"]:
+            return self._currency_input(conn, cfg, c)
         evidence = json.loads(c["evidence"])
         knowledge.check_evidence(conn, evidence)
         kind = "learning" if c["proposal"] == "learning" else ""
@@ -246,12 +266,8 @@ class AuthorPhase:
                 f"{cfg['thresholds']['min_sessions']} distinct sessions needed (4.5)"
             )
         repo = repository(cfg, c["repo"]) if c["proposal"] == "change" else None
-        earlier = repo and adopt.unfinished_adoption(conn, cfg, repo.name, c["run"])
-        if earlier:
-            raise Rejected(
-                f"dream {earlier['run']} merged into {repo.name} without finishing "
-                "its deploy; finish or undo that adoption first"
-            )
+        if repo is not None:
+            _check_unfinished(conn, cfg, repo, c["run"])
         cited = conn.execute(
             "SELECT repo, path FROM file_findings"
             " WHERE evidence_id IN (SELECT value FROM json_each(?)) ORDER BY path",
@@ -272,12 +288,6 @@ class AuthorPhase:
         quote_chars = cfg["thresholds"]["quote_chars"]
         counter = _counter(conn, c["pattern_id"], evidence)
         research = _research(conn, c["id"])
-        instruction_files = {}
-        if repo is not None:
-            for name in INSTRUCTION_FILES:
-                text = repo.read(name)
-                if text is not None:
-                    instruction_files[name] = text
         data = {
             "candidate": {
                 "id": c["id"],
@@ -303,7 +313,7 @@ class AuthorPhase:
                 for row in research
             ],
             "repository": repo.view() if repo else None,
-            "instruction_files": instruction_files,
+            "instruction_files": repo.instruction_files() if repo else {},
             "files": files,
             "omitted_files": [],
         }
@@ -316,10 +326,60 @@ class AuthorPhase:
         )
         return given, data
 
+    def _currency_input(self, conn: sqlite3.Connection, cfg: dict, c: Mapping):
+        """The input for a currency candidate: its finding with the passages it
+        relies on, as data, and the target's current text (16.3). The finding is
+        the change's only evidence; it is not an observation (16.5)."""
+        found = conn.execute(
+            "SELECT * FROM currency_findings WHERE id = ?", (c["currency_finding_id"],)
+        ).fetchone()
+        repo = repository(cfg, c["repo"])
+        _check_unfinished(conn, cfg, repo, c["run"])
+        _, path = config.split_target(found["target"])
+        text = repo.read(path)
+        data = {
+            "candidate": {
+                "id": c["id"],
+                "proposal": c["proposal"],
+                "summary": c["summary"],
+                "reason": c["reason"],
+                "repo": c["repo"],
+            },
+            "evidence": [
+                {
+                    "id": found["id"],
+                    "type": "currency_finding",
+                    "target": found["target"],
+                    "claim": found["claim"],
+                    "assessment": found["assessment"],
+                    # The passages relied on, never the stored page (16.3).
+                    "sources": [
+                        {key: s[key] for key in research.CITED}
+                        for s in json.loads(found["sources"])
+                    ],
+                }
+            ],
+            "counter_evidence": [],
+            "research": [],
+            "repository": repo.view(),
+            "instruction_files": repo.instruction_files(),
+            "files": {} if text is None else {path: text},
+            "omitted_files": [],
+        }
+        given = Given(
+            evidence=[found["id"]],
+            counter=[],
+            research=[],
+            fetched=True,
+            repo=repo,
+            currency=found["id"],
+        )
+        return given, data
+
     def apply(self, conn: sqlite3.Connection, step: Step, a: Authored) -> Outcome:
         c = a.candidate
         if a.deferred is not None:
-            return _defer(conn, c, a.deferred)
+            return _defer(conn, c, a.deferred, a.now)
         out = a.output
         conn.execute(
             "UPDATE candidates SET deferred_steps = ? WHERE id = ?",
@@ -327,7 +387,7 @@ class AuthorPhase:
         )
         if out["outcome"] == "defer" or not out["verification"]["supported"]:
             reason = out["verification"]["reason"].strip() or "the author deferred it"
-            return _defer(conn, c, reason)
+            return _defer(conn, c, reason, a.now)
         cfg = a.cfg
         try:
             if out["outcome"] != c["proposal"]:
@@ -354,18 +414,48 @@ class AuthorPhase:
                 "UPDATE candidates SET status = 'discarded', reason = ? WHERE id = ?",
                 (rejected.reason, c["id"]),
             )
+            _currency_note(conn, c, a.now, rejected.reason)
             return Outcome(reason=f"discarded: {rejected.reason}")
         conn.execute(
             "UPDATE candidates SET status = 'authored' WHERE id = ?", (c["id"],)
         )
+        if c["currency_finding_id"]:
+            conn.execute(
+                "UPDATE currency_findings SET status = 'proposed', reason = NULL,"
+                " updated_at = ? WHERE id = ?",
+                (a.now, c["currency_finding_id"]),
+            )
         return Outcome(reason=f"authored {made}")
 
 
-def _defer(conn: sqlite3.Connection, c: Mapping, reason: str) -> Outcome:
+def _check_unfinished(
+    conn: sqlite3.Connection, cfg: dict, repo: Repository, run_id: str
+) -> None:
+    earlier = adopt.unfinished_adoption(conn, cfg, repo.name, run_id)
+    if earlier:
+        raise Rejected(
+            f"dream {earlier['run']} merged into {repo.name} without finishing "
+            "its deploy; finish or undo that adoption first"
+        )
+
+
+def _currency_note(conn: sqlite3.Connection, c: Mapping, now: str, reason: str):
+    """A currency candidate that was not authored as a change is kept as a
+    currency note (16.4)."""
+    if c["currency_finding_id"]:
+        conn.execute(
+            "UPDATE currency_findings SET status = 'note', reason = ?, updated_at = ?"
+            " WHERE id = ?",
+            (f"not authored: {reason}", now, c["currency_finding_id"]),
+        )
+
+
+def _defer(conn: sqlite3.Connection, c: Mapping, reason: str, now: str) -> Outcome:
     conn.execute(
         "UPDATE candidates SET status = 'deferred', reason = ? WHERE id = ?",
         (reason, c["id"]),
     )
+    _currency_note(conn, c, now, reason)
     return Outcome(reason=f"deferred: {reason}")
 
 
@@ -462,7 +552,8 @@ def _check_change(conn: sqlite3.Connection, cfg: dict, run_id: str, a: Authored)
     evidence = sorted(set(change["evidence"]) | supporting)
     _given(evidence, given.evidence, "the change")
     counter = {i for edit in change["edits"] for i in edit["counter"]}
-    knowledge.check_evidence(conn, [*evidence, *counter])
+    if given.currency is None:
+        knowledge.check_evidence(conn, [*evidence, *counter])
     external = given.fetched or any(
         tool not in config.BUILTIN_TOOLS for tool in cfg["tools"]["author"]
     )
@@ -485,16 +576,17 @@ def _store_change(conn: sqlite3.Connection, run_id: str, a: Authored) -> str:
     c, change, committed = a.candidate, a.change, a.committed
     withheld = committed.withheld is not None
     conn.execute(
-        "INSERT INTO changes (id, run, pattern_id, candidate_id, repo, summary,"
-        " commit_message, depends_on, evidence, edits, research, external_input,"
-        " status, reason, branch, commit_sha, patch_path, rank, base_revision,"
-        " created_at)"
-        " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO changes (id, run, pattern_id, candidate_id, currency_finding_id,"
+        " repo, summary, commit_message, depends_on, evidence, edits, research,"
+        " external_input, status, reason, branch, commit_sha, patch_path, rank,"
+        " base_revision, created_at)"
+        " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         (
             change["id"],
             run_id,
             c["pattern_id"],
             c["id"],
+            a.given.currency,
             c["repo"],
             change["summary"],
             change["commit_message"],

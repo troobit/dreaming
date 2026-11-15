@@ -669,6 +669,17 @@ class Selection:
     skipped: list[Skipped] = field(default_factory=list)  # unparseable (2.7)
     server_warnings: list[dict] = field(default_factory=list)  # report only (2.4)
     warnings: list[dict] = field(default_factory=list)  # apsis listing warnings
+    # Every session the listing and registered files hold, selected or not.
+    listed: dict[tuple[str, str], ListingRow] = field(default_factory=dict)
+
+    def notes(self) -> dict:
+        """What the report lists about this selection (2.3, 2.4, 2.9)."""
+        return {
+            "unmapped_domains": self.unmapped_domains,
+            "unmapped_origins": self.unmapped_origins,
+            "warnings": self.warnings,
+            "server_warnings": self.server_warnings,
+        }
 
     @property
     def unmapped_domains(self) -> list[tuple[str, str]]:
@@ -768,8 +779,10 @@ class _Selector:
     def select(self) -> Selection:
         listing = self.apsis.list_sessions()
         self.selection.warnings = list(listing.warnings)
+        rows = [*listing.rows, *self._file_rows()]
+        self.selection.listed = {(row.source, row.id): row for row in rows}
         groups: dict[tuple, list[ListingRow]] = {}
-        for row in [*listing.rows, *self._file_rows()]:
+        for row in rows:
             key = (row.correlation_id,) if row.correlation_id else (row.source, row.id)
             groups.setdefault(key, []).append(row)
         for group in sorted(groups.values(), key=self._newest_first):
@@ -1005,13 +1018,15 @@ def record_session(
     state: str = "read",
     reason: str | None = None,
     lens_versions: Mapping[str, int] | None = None,
+    inventory: Mapping | None = None,
 ) -> None:
     """Record an interaction on every source copy, in the caller's transaction.
 
     Every copy takes the interaction's attribution and its listing size; the
     content copy also keeps the lens versions and how many entries were read,
-    so a later dream reads only what was added (2.5). The forgotten flag is never
-    changed here (2.11).
+    so a later dream reads only what was added (2.5), and what the part read
+    used (`inventory.session_use`, 8.x). The forgotten flag is never changed
+    here (2.11).
     """
     a = session.attribution
     for row in session.copies:
@@ -1039,6 +1054,8 @@ def record_session(
         if (row.source, row.id) == (session.source, session.id):
             values["lens_versions"] = json.dumps(dict(lens_versions or {}))
             values["entries_read"] = len(session.document.entries)
+            if inventory is not None:
+                values["inventory"] = json.dumps(inventory)
         _upsert_seen(conn, values)
 
 
@@ -1057,6 +1074,46 @@ def record_skipped(
             "last_run": run_id,
         },
     )
+
+
+def _shrank(seen: Mapping, row: ListingRow) -> bool:
+    """A listed session smaller than when it was read: sessions only grow, so
+    its source was rewritten."""
+    return any(
+        now is not None and before is not None and now < before
+        for now, before in (
+            (row.size_bytes, seen["size_bytes"]),
+            (row.request_count, seen["request_count"]),
+        )
+    )
+
+
+def mark_availability(
+    conn: sqlite3.Connection, listed: Mapping[tuple[str, str], ListingRow]
+) -> None:
+    """Mark the evidence of each session by what became of its source (13.7):
+    `unavailable` when the listing no longer holds it, `changed` when it is
+    smaller than when read, and `available` again when an unavailable one is
+    listed once more. Evidence and counts are kept either way; the marker only
+    tells consumers the quote can no longer be checked against its source."""
+    for seen in conn.execute(
+        "SELECT source, session_id, size_bytes, request_count FROM sessions_seen s"
+        " WHERE EXISTS (SELECT 1 FROM observations o"
+        " WHERE o.source = s.source AND o.session_id = s.session_id)"
+    ).fetchall():
+        row = listed.get((seen["source"], seen["session_id"]))
+        if row is None:
+            marks = {"available": "unavailable", "changed": "unavailable"}
+        elif _shrank(seen, row):
+            marks = {"available": "changed", "unavailable": "changed"}
+        else:
+            marks = {"unavailable": "available"}
+        for before, after in marks.items():
+            conn.execute(
+                "UPDATE observations SET availability = ?"
+                " WHERE source = ? AND session_id = ? AND availability = ?",
+                (after, seen["source"], seen["session_id"], before),
+            )
 
 
 # Registration (2.9, 2.10, 14.8)

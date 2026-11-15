@@ -11,6 +11,10 @@ text of the files concerned (`files`; read any in `omitted_files` with your
 file tools), and the repository's own `instruction_files` (such as `CLAUDE.md`
 or `AGENTS.md`), which describe its conventions.
 
+A currency candidate's `evidence` is one currency finding: a claim that the
+target is outdated, contradicted or missing a practice, with the passages its
+sources rely on. Cite its id as each edit's supporting case.
+
 ## First, verify
 
 Check that the cited evidence still supports the candidate against the current

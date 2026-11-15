@@ -33,7 +33,7 @@ SCHEMA_VERSION = 1
 TABLES = {
     "runs": (("id",), ()),
     "patterns": (("id",), ("scope",)),
-    "sessions_seen": (("source", "session_id"), ("lens_versions",)),
+    "sessions_seen": (("source", "session_id"), ("lens_versions", "inventory")),
     "observations": (("evidence_id",), ()),
     "file_findings": (("evidence_id",), ()),
     "research_findings": (("id",), ("sources",)),

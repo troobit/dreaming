@@ -13,6 +13,8 @@ Scenario keys (all optional):
   answer             the structured output to return instead of the probe answer
   no_usage           omit usage from the result
   sleep              seconds to wait before answering
+  responder          a Python file whose answer(prompt, schema) gives the
+                     structured output, or None for the default answer
 Every invocation is appended to FAKE_LOG as JSON (argv, cwd, selected env and
 the prompt read from stdin).
 """
@@ -21,6 +23,7 @@ from __future__ import annotations
 
 import json
 import os
+import runpy
 import sys
 import time
 from pathlib import Path
@@ -72,6 +75,11 @@ def main() -> int:
         "model": "claude-test",
     }
     answer = scenario.get("answer", {"canary": canary, "tools": tools})
+    if scenario.get("responder"):
+        schema = json.loads(args[args.index("--json-schema") + 1]) if "--json-schema" in args else {}
+        scripted = runpy.run_path(scenario["responder"])["answer"](stdin, schema)
+        if scripted is not None:
+            answer = scripted
     result = {
         "type": "result",
         "subtype": "success",

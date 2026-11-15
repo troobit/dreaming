@@ -1,6 +1,7 @@
 """A fake model, a fake clock and small phases for run-engine tests."""
 
 import json
+import shutil
 import subprocess
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -195,6 +196,19 @@ def instruction_repo(root: Path) -> Path:
         '[[lens]]\nid = "prefs"\nversion = 1\nlook_for = "preferences"\n'
         'may_propose = ["knowledge"]\n'
     )
+    git(repo, "add", ".")
+    git(repo, "commit", "-q", "-m", "instructions")
+    return repo
+
+
+def instruction_set(root: Path) -> Path:
+    """A repository holding the shipped instruction set on `main`, which a real
+    dream's phases load from its snapshot."""
+    repo = root / "instruction-set"
+    shutil.copytree(Path(__file__).parents[1] / "instructions", repo / "instructions")
+    git(root, "init", "-q", "-b", "main", str(repo))
+    git(repo, "config", "user.email", "test@example.com")
+    git(repo, "config", "user.name", "Test")
     git(repo, "add", ".")
     git(repo, "commit", "-q", "-m", "instructions")
     return repo

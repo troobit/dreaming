@@ -4,8 +4,8 @@ A section body takes the connection, the run's row and the run's configuration
 and returns HTML, or "" to leave the section out. Every stored text is escaped,
 and links are rendered only for http and https (16.2).
 
-`effect` and `inventory` show an empty state until effect measurement and the
-tooling inventory fill them in.
+`inventory` shows the inventory recorded as the run ended, or an empty state
+when none was recorded.
 """
 
 from __future__ import annotations
@@ -16,9 +16,13 @@ from collections import Counter
 from collections.abc import Callable, Iterable, Sequence
 from fnmatch import fnmatchcase
 from itertools import groupby
+from pathlib import Path
 from urllib.parse import urlsplit
 
 from dreaming import adopt, budget
+from dreaming import effect as effects
+from dreaming import inventory as tooling
+from dreaming.backends import mcp
 from dreaming.report.shell import card, escape, pill, verdict
 
 Body = Callable[[sqlite3.Connection, sqlite3.Row, dict], str]
@@ -635,45 +639,267 @@ def research(conn: sqlite3.Connection, run: sqlite3.Row, cfg: dict) -> str:
 
 def currency(conn: sqlite3.Connection, run: sqlite3.Row, cfg: dict) -> str:
     """Currency notes and the currency findings proposed as changes (16.2–16.5),
-    apart from learning recommendations and from evidence about the user."""
+    apart from learning recommendations and from evidence about the user, with
+    the sources that could not be read and the targets not reviewed."""
+    rid = run["id"]
     rows = conn.execute(
-        "SELECT * FROM currency_findings WHERE run = ?"
+        "SELECT * FROM currency_findings WHERE run = ? OR id IN"
+        " (SELECT currency_finding_id FROM candidates WHERE run = ?)"
         " ORDER BY status != 'note', target, id",
-        (run["id"],),
+        (rid, rid),
     ).fetchall()
-    if not rows:
+    unread = conn.execute(
+        "SELECT link, error FROM fetched_pages WHERE run = ? AND error IS NOT NULL"
+        " ORDER BY link",
+        (rid,),
+    ).fetchall()
+    missed = conn.execute(
+        "SELECT input_ref, reason FROM steps WHERE run = ? AND phase = 'research'"
+        " AND reason IS NOT NULL ORDER BY seq",
+        (rid,),
+    ).fetchall()
+    if run["kind"] != "currency" and not rows:
         return ""
     quote_chars = cfg["thresholds"]["quote_chars"]
-    intro = (
+    parts = [
         '<p class="muted">Currency findings compare skills, rules and workflows '
         "with current sources. They are not learning recommendations and not "
         "evidence about you; a note is kept for reference, a proposed finding "
         "became a repository change.</p>"
-    )
-    return intro + _table(
-        ("Target", "Finding", "Status", "Sources"),
-        (
-            (
-                r["target"],
-                _with_reason(r["claim"], r["reason"]),
-                Html(pill(r["status"], TONES.get(r["status"], "tertiary"))),
-                Html(_sources(r["sources"], quote_chars)),
+    ]
+    if rows:
+        parts.append(
+            _table(
+                ("Target", "Finding", "Status", "Sources"),
+                (
+                    (
+                        r["target"],
+                        _with_reason(r["claim"], r["reason"]),
+                        Html(pill(r["status"], TONES.get(r["status"], "tertiary"))),
+                        Html(_sources(r["sources"], quote_chars)),
+                    )
+                    for r in rows
+                ),
             )
-            for r in rows
-        ),
-    )
+        )
+    else:
+        parts.append(_empty("This review kept no finding."))
+    if missed and run["kind"] == "currency":
+        parts += [
+            "<h3>Targets not reviewed</h3>",
+            _table(("Target", "Reason"), ((m[0], m[1]) for m in missed)),
+        ]
+    if unread:
+        items = "".join(
+            f"<li>{escape(u['link'])}: {escape(u['error'])}</li>" for u in unread
+        )
+        parts.append(
+            '<div class="callout callout-warning">'
+            f"<strong>Could not be read, skipped.</strong><ul>{items}</ul></div>"
+        )
+    return "\n".join(parts)
 
 
 def effect(conn: sqlite3.Connection, run: sqlite3.Row, cfg: dict) -> str:
-    """Before-and-after counts for applied changes (11.1). An empty state until
-    effect measurement fills it in."""
-    return _empty("Effect measurement of applied changes is not available yet.")
+    """Each applied change's pattern before and after it was applied, as raw
+    counts labelled association (11.1), and the calibration statistics: distinct
+    sessions per pattern and replays against later recurrence (design, Risks
+    and Assumptions)."""
+    found = effects.measured(conn, cfg)
+    parts = [
+        '<p class="muted">Observations of each changed pattern and sessions read '
+        "under its lens, before and after the change was applied. They show an "
+        f"{effects.LABEL}, that the change made any difference.</p>"
+    ]
+    if found:
+        parts.append(
+            _table(
+                ("Change", "Applied", "Before", "After", "Result"),
+                (
+                    (
+                        _with_reason(e.summary, f"pattern {e.pattern_id}"),
+                        e.applied_at[:10]
+                        + (f", reverted {e.reverted_at[:10]}" if e.reverted_at else ""),
+                        effects.observation_counts(
+                            e.before_observations, e.before_sessions
+                        ),
+                        effects.observation_counts(
+                            e.after_observations, e.after_sessions
+                        ),
+                        effects.describe(e),
+                    )
+                    for e in found
+                ),
+            )
+        )
+    else:
+        parts.append(_empty("No change has been applied yet."))
+    spread = effects.session_distribution(conn)
+    if spread:
+        parts += [
+            "<h3>Distinct sessions per pattern</h3>",
+            _table(("Distinct sessions", "Patterns"), spread),
+        ]
+    replays = effects.replay_against_recurrence(conn, cfg)
+    if replays:
+        parts += [
+            "<h3>Replay against later recurrence</h3>",
+            _table(
+                ("Change", "Sessions replayed", "Recurred with the change", "Later"),
+                (
+                    (r["summary"], r["replayed"], r["recurred_with_change"], r["later"])
+                    for r in replays
+                ),
+            ),
+        ]
+    return "\n".join(parts)
+
+
+STAGES = {
+    "evidence_gathering": "Evidence gathering",
+    "reflection": "Reflection",
+    "selection": "Candidate selection",
+    "adoption": "Adoption",
+}
+
+
+def outcomes(conn: sqlite3.Connection, run: sqlite3.Row, cfg: dict) -> str:
+    """What evidence gathering, reflection, candidate selection and adoption came
+    to, with the reason for each deferral (11.6)."""
+    found = effects.stage_outcomes(conn, run["id"])
+    rows = [
+        (
+            label,
+            ", ".join(
+                f"{key.replace('_', ' ')} {value}"
+                for key, value in found[stage].items()
+            ),
+        )
+        for stage, label in STAGES.items()
+    ]
+    parts = [_table(("Stage", "Outcome"), rows)]
+    if found["deferred"]:
+        parts += [
+            "<h3>Deferred, discarded or waiting</h3>",
+            _table(
+                ("Stage", "What", "Reason"),
+                (
+                    (STAGES[d["stage"]], d["subject"], d["reason"])
+                    for d in found["deferred"]
+                ),
+            ),
+        ]
+    return "\n".join(parts)
+
+
+def _counts(found: dict) -> str:
+    return ", ".join(f"{name} {count}" for name, count in found.items())
+
+
+def _weight_part(part: dict) -> str:
+    if part["tokens"] is None:
+        return "unavailable"
+    approx = "" if part["label"] == "measured" else "≈"
+    return f"{approx}{part['tokens']:,} tokens, {part['label']} from {part['from']}"
 
 
 def inventory(conn: sqlite3.Connection, run: sqlite3.Row, cfg: dict) -> str:
-    """The tooling inventory and context weight (8.1, 8.2, 10.4). An empty state
-    until the inventory fills it in."""
-    return _empty("The tooling inventory and context weight are not measured yet.")
+    """The tooling inventory and context weight as the run ended (8.1, 8.2,
+    10.4): MCP servers configured against their use per harness, the needs a
+    tool could have met, and the context before the first prompt with its
+    largest contributors, flagged over the configured share of a known window."""
+    found = tooling.load(conn, run["id"])
+    if found is None:
+        return _empty("The tooling inventory and context weight are not measured yet.")
+    parts = ["<h3>MCP servers and tools by harness</h3>"]
+    for name, h in found["harnesses"].items():
+        servers = sorted(set(h["configured"]) | set(h["servers"]))
+        rows = [
+            (
+                server,
+                "configured" if server in h["configured"] else "not configured",
+                sum(h["servers"].get(server, {}).values()),
+                _counts(h["servers"].get(server, {})),
+            )
+            for server in servers
+        ]
+        notes = [f"{_plural(h['sessions'], 'session')} read"]
+        if h["never_used"]:
+            notes.append(f"Never used: {', '.join(h['never_used'])}")
+        if h["available"]:
+            notes.append(
+                "In the shared definitions, not configured: "
+                + ", ".join(h["available"])
+            )
+        if h["tools"]:
+            notes.append(f"Other tools used: {_counts(h['tools'])}")
+        if h["skills"]:
+            notes.append(f"Skills used: {_counts(h['skills'])}")
+        parts.append(f"<h4>{escape(name)}</h4>")
+        if rows:
+            parts.append(_table(("Server", "State", "Uses", "Tools used"), rows))
+        parts.append(
+            "<ul>" + "".join(f"<li>{escape(note)}</li>" for note in notes) + "</ul>"
+        )
+    if found["needs"]:
+        parts += [
+            "<h3>Needs a configured or available tool could have met</h3>",
+            _table(
+                ("Session", "Observed", "Pattern"),
+                ((n["session"], n["quote"], n["key"]) for n in found["needs"]),
+            ),
+        ]
+    share = found["share"]
+    rows = []
+    for row in found["context"]:
+        total = row["total"]
+        shown = (
+            "unavailable"
+            if total["tokens"] is None
+            else f"{total['tokens']:,} tokens, {total['label']}"
+        )
+        if row["window"]:
+            shown += f" of a {row['window']:,}-token window"
+        cell = escape(shown)
+        if row["flagged"]:
+            cell += " " + pill(f"over {share:.0%} of the window", "warning")
+        rows.append(
+            (
+                row["harness"],
+                row["model"] or "unknown",
+                _weight_part(row["instructions"]),
+                _weight_part(row["skills"]),
+                _weight_part(row["tool_schemas"]),
+                _weight_part(row["measured"]),
+                Html(cell),
+                ", ".join(f"{c['name']} ≈{c['tokens']:,}" for c in row["contributors"]),
+            )
+        )
+    parts += [
+        "<h3>Context before the first prompt</h3>",
+        '<p class="muted">Estimates are UTF-8 bytes divided by four; a measured '
+        "value comes from a session's own usage record.</p>",
+        _table(
+            (
+                "Harness",
+                "Model",
+                "Instructions",
+                "Skill listings",
+                "Tool schemas",
+                "Measured",
+                "Total",
+                "Largest contributors",
+            ),
+            rows,
+        ),
+    ]
+    if found["problems"]:
+        items = "".join(f"<li>{escape(p)}</li>" for p in found["problems"])
+        parts.append(
+            '<div class="callout callout-warning">'
+            f"<strong>Could not be read, skipped.</strong><ul>{items}</ul></div>"
+        )
+    return "\n".join(parts)
 
 
 def unmerged(conn: sqlite3.Connection, run: sqlite3.Row, cfg: dict) -> str:
@@ -746,6 +972,81 @@ def config_changes(conn: sqlite3.Connection, run: sqlite3.Row, cfg: dict) -> str
     return note + _table(("Repository", "Change", "Touches", "Paths", "Status"), rows)
 
 
+def unavailable_integrations(
+    conn: sqlite3.Connection, run: sqlite3.Row, cfg: dict
+) -> list[tuple[str, str]]:
+    """Optional integrations the dream went on without (14.4): backends whose
+    latest probe found them unusable (5.5), knowledge folders that do not exist
+    (4.6) and MCP tools the shared definitions do not supply."""
+    probes: dict[str, sqlite3.Row] = {}
+    for row in conn.execute(
+        "SELECT backend, outcome, error FROM calls WHERE run = ? AND role = 'probe'"
+        " ORDER BY rowid",
+        (run["id"],),
+    ):
+        probes[row["backend"]] = row
+    found = [
+        (f"backend {name}", row["error"] or "not usable")
+        for name, row in sorted(probes.items())
+        if row["outcome"] == "unavailable"
+    ]
+    found += [
+        (f"knowledge folder {folder}", "does not exist, so research went without it")
+        for folder in cfg["knowledge_folders"]
+        if not Path(folder).expanduser().is_dir()
+    ]
+    found += [
+        (f"{m['tool']} for the {m['role']}", m["reason"])
+        for m in mcp.unavailable_tools(cfg)
+    ]
+    return found
+
+
+def _warning(warning: dict) -> tuple[str, str, str]:
+    text = warning.get("message") or warning.get("text") or json.dumps(warning)
+    kind = warning.get("code") or warning.get("role") or ""
+    return warning.get("source", ""), kind, text
+
+
+def sources(conn: sqlite3.Connection, run: sqlite3.Row, cfg: dict) -> str:
+    """What the dream went without or could not attribute: unavailable optional
+    integrations (14.4), sources and projects processed under the unassigned
+    domain (2.3), origins counted as interactive because nothing maps them
+    (2.9), and listing and unattributed server warnings (2.4)."""
+    parts = []
+    missing = unavailable_integrations(conn, run, cfg)
+    if missing:
+        parts += [
+            "<h3>Unavailable integrations</h3>",
+            '<p class="muted">The dream went on without them.</p>',
+            _table(("Integration", "Why"), missing),
+        ]
+    notes = json.loads(run["selection_notes"] or "{}")
+    if notes.get("unmapped_domains"):
+        parts += [
+            "<h3>Under the unassigned domain</h3>",
+            '<p class="muted">No configured domain maps these sources and projects, '
+            "so their sessions were processed under the unassigned domain.</p>",
+            _table(("Source", "Project"), notes["unmapped_domains"]),
+        ]
+    if notes.get("unmapped_origins"):
+        parts += [
+            "<h3>Unmapped client origins</h3>",
+            '<p class="muted">Counted as interactive because no configured origin '
+            "maps them.</p>",
+            _table(("Source", "Origin"), notes["unmapped_origins"]),
+        ]
+    warnings = [*notes.get("warnings", []), *notes.get("server_warnings", [])]
+    if warnings:
+        parts += [
+            "<h3>Session source warnings</h3>",
+            '<p class="muted">Listing warnings, and server warnings and errors no '
+            "request is attributed to; none is attached to a session.</p>",
+            _table(("Source", "Kind", "Warning"), map(_warning, warnings)),
+        ]
+    return "\n".join(parts)
+
+
 def forgotten(conn: sqlite3.Connection, run: sqlite3.Row, cfg: dict) -> str:
     """Forgotten sessions, which no dream reads or counts until restored (2.11)."""
     rows = conn.execute(
@@ -769,6 +1070,8 @@ def forgotten(conn: sqlite3.Connection, run: sqlite3.Row, cfg: dict) -> str:
 # left out, with its table-of-contents entry.
 SECTIONS: list[tuple[str, str, Body]] = [
     ("statistics", "Statistics", statistics),
+    ("sources", "Sources and integrations", sources),
+    ("outcomes", "Outcomes by stage", outcomes),
     ("knowledge", "Knowledge retained", knowledge),
     ("learning", "Learning recommendations", learning),
     ("changes", "Repository changes", changes),

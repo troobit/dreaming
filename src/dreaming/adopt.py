@@ -89,6 +89,13 @@ def _failed(command: str, result: ProcessResult) -> str:
     return f"{command!r} exited {result.returncode}{tail}"
 
 
+def branch_exists(repo: Path, branch: str) -> bool:
+    found = _git(
+        repo, "rev-parse", "--verify", "--quiet", f"refs/heads/{branch}", check=False
+    )
+    return found.returncode == 0
+
+
 def is_ancestor(repo: Path, commit: str, of: str) -> bool:
     """Whether `commit` is in the history of `of`; git, not a stored row, says
     whether a merge happened (design, Adoption step 4)."""
@@ -1075,9 +1082,7 @@ def remove_branches(home: Path, cfg: dict, run_id: str) -> list[dict]:
         path = repo_path(cfg, name)
         if not path.is_dir():
             continue
-        ref = f"refs/heads/{branch}"
-        found = _git(path, "rev-parse", "--verify", "--quiet", ref, check=False)
-        if found.returncode != 0:
+        if not branch_exists(path, branch):
             continue
         _git(path, "branch", "-D", branch)
         removed.append({"repo": name, "branch": branch})

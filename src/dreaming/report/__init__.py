@@ -16,6 +16,7 @@ import webbrowser
 from datetime import UTC, datetime
 from pathlib import Path
 
+from dreaming import inventory
 from dreaming.errors import USAGE_ERROR, DreamingError
 from dreaming.report import sections, shell
 
@@ -55,7 +56,9 @@ def render(conn: sqlite3.Connection, run_id: str, cfg: dict) -> str:
 
 
 def write(conn: sqlite3.Connection, run_id: str, home: Path, cfg: dict) -> Path:
-    """Write the report, record where it is and return its location (10.1)."""
+    """Record the run's tooling inventory as it ends (8.x), write the report,
+    record where it is and return its location (10.1)."""
+    inventory.record(conn, cfg, run_id)
     path = report_path(home, run_id)
     path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
     path.write_text(render(conn, run_id, cfg), encoding="utf-8")
@@ -69,6 +72,12 @@ def open_report(path: Path, requester: str, cfg: dict) -> bool:
     never raised, so it cannot fail the dream (10.1)."""
     if requester != USER or not cfg["report"]["open_browser"]:
         return False
+    return open_in_browser(path)
+
+
+def open_in_browser(path: Path) -> bool:
+    """Open a report in the default browser, reporting rather than raising a
+    failure."""
     try:
         opened = webbrowser.open(path.as_uri())
     except Exception as exc:

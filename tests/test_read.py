@@ -15,7 +15,15 @@ from dreamkit import (
 from hypothesis import given
 from hypothesis import strategies as st
 from runkit import Crash, FakeClock, LocalPhase, add_run, make_runner, step_states
-from sessiondocs import StubApsis, add_seen, days_ago, make_doc, make_entry, select
+from sessiondocs import (
+    StubApsis,
+    add_observation,
+    add_seen,
+    days_ago,
+    make_doc,
+    make_entry,
+    select,
+)
 
 from dreaming import knowledge, observe, review, sessions
 from dreaming.run import Context
@@ -71,6 +79,34 @@ def test_read_steps_come_from_the_selection_and_review_waits_for_all(db, home):
     assert refs[2] == {"source": "claude", "id": "broken", "skipped": "cannot parse"}
     assert refs[0]["attribution"]["project"] == "/work/repo"
     assert refs[0]["copies"][0]["id"] == "s1"
+
+
+def test_planning_keeps_selection_notes_and_marks_evidence_by_its_source(db, home):
+    """The report lists what selection could not attribute (2.3, 2.4, 2.9), and
+    evidence of a session no longer listed is marked unavailable (13.7)."""
+    cfg = build_config()
+    warning = {"code": "unreadable", "message": "a log could not be read"}
+    apsis = StubApsis(
+        doc("s1", "use uv", origin="mystery-client"), listing_warnings=[warning]
+    )
+    add_seen(db, "claude", "gone")
+    add_observation(db, "ev-gone", "claude", "gone")
+    add_run(db, "dream-test", cfg)
+    runner = make_runner(
+        db, home, "dream-test", cfg, phases={}, model=None, clock=FakeClock()
+    )
+    observe.ReadPhase(instructions(cfg), apsis).plan(Context(runner, None))
+    notes = json.loads(
+        db.execute("SELECT selection_notes FROM runs").fetchone()["selection_notes"]
+    )
+    assert notes == {
+        "unmapped_domains": [["claude", "/work/repo"]],
+        "unmapped_origins": [["claude", "mystery-client"]],
+        "warnings": [warning],
+        "server_warnings": [],
+    }
+    (marked,) = db.execute("SELECT availability FROM observations").fetchall()
+    assert marked["availability"] == "unavailable"
 
 
 # Reading

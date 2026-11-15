@@ -50,7 +50,11 @@ Each piece of evidence has an `id`, a short `quote`, its `kind`, `modality`,
 - `item_merges`: items that state the same interpretation in the same scope.
 - `candidates`: a proposed repository `change` or a `learning` recommendation
   for a pattern with enough support. Skip a pattern that has an unmerged
-  change. Name the configured `repo` for a change.
+  change. Name the configured `repo` for a change. A pattern whose earlier
+  change was applied is a candidate again only with status `recurring`: it
+  recurs at or above its rate before that change. Read the change's `effect`
+  (counts before and after, an association rather than proof) and propose
+  something that improves on it.
 - `questions`: only what a researcher must answer before a candidate can be
   authored; `candidate` is its index in `candidates`.
 

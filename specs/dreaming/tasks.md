@@ -401,47 +401,47 @@ references:
 
 ## Outputs
 
-- [ ] 26. Currency-review dream <!-- id:w1na5f3 -->
+- [x] 26. Currency-review dream <!-- id:w1na5f3 -->
   - Blocked-by: w1na5el (Researcher and author phases), w1na5eu (Dream branch, commits and public-repository scan)
   - Stream: 1
   - Requirements: [4.6](requirements.md#4.6), [15.2](requirements.md#15.2), [16.1](requirements.md#16.1), [16.2](requirements.md#16.2), [16.3](requirements.md#16.3), [16.4](requirements.md#16.4), [16.5](requirements.md#16.5), [16.6](requirements.md#16.6)
-  - [ ] 26.1. Write tests for the currency run kind <!-- id:w1na5f4 -->
+  - [x] 26.1. Write tests for the currency run kind <!-- id:w1na5f4 -->
     - No Read phase and no sessions; source limit and budget enforced; one source never yields a candidate and same-domain sources count once; a relied-on passage absent from the stored text rejects the finding; fetched text only in delimited data fields; changes committed to the branch and never merged; non-file findings kept as currency notes returned only on request; equivalent finding reuses its identifier, dismissed or unmerged-deleted finding not proposed again without a new independent source; findings never counted as observations
     - Blocked-by: w1na5el (Researcher and author phases), w1na5eu (Dream branch, commits and public-repository scan)
     - Stream: 1
     - Requirements: [16.1](requirements.md#16.1), [16.2](requirements.md#16.2), [16.3](requirements.md#16.3), [16.4](requirements.md#16.4), [16.5](requirements.md#16.5), [16.6](requirements.md#16.6)
-  - [ ] 26.2. Implement the currency run kind <!-- id:w1na5f5 -->
+  - [x] 26.2. Implement the currency run kind <!-- id:w1na5f5 -->
     - Research step per configured target with read, search and fetch tools; verbatim passage verification in the program; fetched pages stored with title, link, retrieval date
     - Blocked-by: w1na5f4 (Write tests for the currency run kind)
     - Stream: 1
     - Requirements: [4.6](requirements.md#4.6), [16.1](requirements.md#16.1), [16.2](requirements.md#16.2), [16.3](requirements.md#16.3), [16.4](requirements.md#16.4), [16.5](requirements.md#16.5), [16.6](requirements.md#16.6)
 
-- [ ] 27. Effect measurement, re-candidacy and calibration statistics <!-- id:w1na5f6 -->
+- [x] 27. Effect measurement, re-candidacy and calibration statistics <!-- id:w1na5f6 -->
   - Blocked-by: w1na5ei (Reviewer phase), w1na5ex (Checks, fast-forward merge, deploy and rollback)
   - Stream: 1
   - Requirements: [6.7](requirements.md#6.7), [11.1](requirements.md#11.1), [11.2](requirements.md#11.2), [11.6](requirements.md#11.6)
-  - [ ] 27.1. Write tests for before/after rates and calibration <!-- id:w1na5f7 -->
+  - [x] 27.1. Write tests for before/after rates and calibration <!-- id:w1na5f7 -->
     - Raw counts of observations and in-scope sessions before and after applied_at labelled association; insufficient evidence for a zero-session baseline, too few sessions or file-only findings; re-candidacy at or above the pre-change rate up to max_changes_per_pattern; calibration queries: distinct-session distribution per pattern and replay outcome versus later recurrence
     - Blocked-by: w1na5ei (Reviewer phase), w1na5ex (Checks, fast-forward merge, deploy and rollback)
     - Stream: 1
     - Requirements: [11.1](requirements.md#11.1), [11.2](requirements.md#11.2)
-  - [ ] 27.2. Implement effect measurement and calibration queries <!-- id:w1na5f8 -->
+  - [x] 27.2. Implement effect measurement and calibration queries <!-- id:w1na5f8 -->
     - Adds the report's effect measurement section and its test, extending the report from task 29
     - Feeds the report and the reviewer context; records outcomes of evidence gathering, reflection, selection and adoption with reasons for deferrals
     - Blocked-by: w1na5f7 (Write tests for before/after rates and calibration), w1na5fc (Dream report)
     - Stream: 1
     - Requirements: [6.7](requirements.md#6.7), [11.1](requirements.md#11.1), [11.2](requirements.md#11.2), [11.6](requirements.md#11.6)
 
-- [ ] 28. Tooling inventory and context weight <!-- id:w1na5f9 -->
+- [x] 28. Tooling inventory and context weight <!-- id:w1na5f9 -->
   - Blocked-by: w1na5dc (apsis client and contract checks)
   - Stream: 2
   - Requirements: [8.1](requirements.md#8.1), [8.2](requirements.md#8.2)
-  - [ ] 28.1. Write tests for the tooling inventory <!-- id:w1na5fa -->
+  - [x] 28.1. Write tests for the tooling inventory <!-- id:w1na5fa -->
     - MCP servers and tools configured per harness versus used in sessions read, never-used tools, sessions showing a need an available tool could meet; context before the first prompt by instructions, skills and tool schemas labelled measured, estimated or unavailable; flag above the configured share of a known window
     - Blocked-by: w1na5dc (apsis client and contract checks)
     - Stream: 2
     - Requirements: [8.1](requirements.md#8.1), [8.2](requirements.md#8.2)
-  - [ ] 28.2. Implement inventory.py <!-- id:w1na5fb -->
+  - [x] 28.2. Implement inventory.py <!-- id:w1na5fb -->
     - Adds the report's tooling inventory section and its test, extending the report from task 29
     - Reads harness configuration files and shared session documents; largest contributors named
     - Blocked-by: w1na5fa (Write tests for the tooling inventory), w1na5fc (Dream report)
@@ -465,31 +465,31 @@ references:
     - Stream: 2
     - Requirements: [10.5](requirements.md#10.5), [12.3](requirements.md#12.3)
 
-- [ ] 30. `dream` agent skill <!-- id:w1na5ff -->
+- [x] 30. `dream` agent skill <!-- id:w1na5ff -->
   - Blocked-by: w1na5er (Run and session operations)
   - Stream: 2
   - Requirements: [1.1](requirements.md#1.1), [10.1](requirements.md#10.1), [14.1](requirements.md#14.1)
-  - [ ] 30.1. Write tests for the skill <!-- id:w1na5fg -->
+  - [x] 30.1. Write tests for the skill <!-- id:w1na5fg -->
     - tests check that skills/dream/SKILL.md exists with valid frontmatter and invokes only the installed `dream` command and `dream api`; `make lint` passes
     - Blocked-by: w1na5er (Run and session operations)
     - Stream: 2
     - Requirements: [14.1](requirements.md#14.1)
-  - [ ] 30.2. Add skills/dream/SKILL.md <!-- id:w1na5fh -->
+  - [x] 30.2. Add skills/dream/SKILL.md <!-- id:w1na5fh -->
     - Start (with dry-run and scope options), inspect, resume and open the report through the installed `dream` command; works from any directory; requester `user`; other harness repositories install the skill by copying this directory
     - Blocked-by: w1na5fg (Write tests for the skill)
     - Stream: 2
     - Requirements: [1.1](requirements.md#1.1), [10.1](requirements.md#10.1), [14.1](requirements.md#14.1)
 
-- [ ] 31. Portable end-to-end test and wiring <!-- id:w1na5fi -->
+- [x] 31. Portable end-to-end test and wiring <!-- id:w1na5fi -->
   - Blocked-by: w1na5eo (Knowledge operations: recall, search, get, feedback, export, import), w1na5er (Run and session operations), w1na5fc (Dream report), w1na5ec (Reader trial command for local models), w1na5f0 (Replay gate and fetched-content rule), w1na5f3 (Currency-review dream)
   - Stream: 1
   - Requirements: [14.1](requirements.md#14.1), [14.3](requirements.md#14.3), [14.4](requirements.md#14.4)
-  - [ ] 31.1. Write an end-to-end test in a fresh DREAMING_HOME <!-- id:w1na5fj -->
+  - [x] 31.1. Write an end-to-end test in a fresh DREAMING_HOME <!-- id:w1na5fj -->
     - A source, backend and store outside any agentic-coding checkout, no skills installed, no target repository: a dream retains knowledge, writes the report, exports; export imports into a second fresh store preserving identifiers, scopes, availability markers, dismissed and forgotten states; unavailable optional integrations reported without blocking
     - Blocked-by: w1na5eo (Knowledge operations: recall, search, get, feedback, export, import), w1na5er (Run and session operations), w1na5fc (Dream report), w1na5ec (Reader trial command for local models), w1na5f0 (Replay gate and fetched-content rule), w1na5f3 (Currency-review dream)
     - Stream: 1
     - Requirements: [14.3](requirements.md#14.3), [14.4](requirements.md#14.4)
-  - [ ] 31.2. Wire remaining gaps found by the end-to-end test <!-- id:w1na5fk -->
+  - [x] 31.2. Wire remaining gaps found by the end-to-end test <!-- id:w1na5fk -->
     - Fix integration defects only; add tests for each
     - Blocked-by: w1na5fj (Write an end-to-end test in a fresh DREAMING_HOME)
     - Stream: 1

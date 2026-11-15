@@ -109,8 +109,34 @@ def test_dream_run_dry_run_prints_the_plan(home, fakes, capsys):
 
     assert cli.main(["run", "--dry-run", "--json"]) == 0
     result = json.loads(capsys.readouterr().out)
-    assert set(result) == {"resumes", "sessions", "skipped", "roles", "budget"}
+    assert set(result) == {
+        "resumes",
+        "sessions",
+        "skipped",
+        "roles",
+        "budget",
+        "kind",
+        "targets",
+    }
+    assert (result["kind"], result["targets"]) == ("dream", [])
     assert result["roles"]["reader"][0]["status"] == "unprobed"
+
+
+def test_relative_paths_are_taken_from_the_callers_directory(
+    home, fakes, tmp_path, monkeypatch
+):
+    """The detached child runs in the home, so `--repo .` from the skill must
+    reach the run as the caller's directory (2.8)."""
+    checkout = tmp_path / "checkout"
+    (checkout / "sub").mkdir(parents=True)
+    monkeypatch.chdir(checkout / "sub")
+    selection = cli._selection(
+        cli._parser().parse_args(["run", "--repo", ".", "--project", "../sub"])
+    )
+    assert selection == {
+        "project": str(checkout / "sub"),
+        "scope": {"project": str(checkout / "sub")},
+    }
 
 
 # The plan view

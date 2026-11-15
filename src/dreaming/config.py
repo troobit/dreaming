@@ -13,7 +13,7 @@ import subprocess
 import tomllib
 from dataclasses import dataclass
 from fnmatch import fnmatchcase
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any
 
 from dreaming.errors import USAGE_ERROR, DreamingError
@@ -77,6 +77,9 @@ DEFAULTS: dict[str, Any] = {
     "instructions": {"repo": "", "branch": "main"},
     "apsis": {"command": "apsis", "codex_exec_dirs": [], "lmstudio_log_dir": ""},
     "knowledge_folders": [],
+    # Skills, rules and workflows a currency review checks, each `<repo>:<path>`
+    # in a configured repository (16.1).
+    "currency": {"targets": []},
     # The shared MCP definitions (agentic-coding's mcp/servers.json); a call gets
     # only the servers and tools its role lists.
     "mcp": {"servers_file": ""},
@@ -376,6 +379,25 @@ def _check_names_file(cfg: dict) -> None:
             )
 
 
+def split_target(target: str) -> tuple[str, str]:
+    """A currency target's repository name and path."""
+    repo, _, path = target.partition(":")
+    return repo, path
+
+
+def _check_currency(cfg: dict) -> None:
+    for target in cfg["currency"]["targets"]:
+        repo, path = split_target(target)
+        parts = PurePosixPath(path).parts
+        if repo not in cfg["repositories"]:
+            raise _invalid(
+                "currency.targets",
+                f"{target} must be <repo>:<path> in a configured repository",
+            )
+        if not parts or path.startswith("/") or ".." in parts or parts[0] == ".git":
+            raise _invalid("currency.targets", f"{target} needs a path inside {repo}")
+
+
 def build_config(raw: dict) -> dict:
     """Validate a parsed config file and merge it over the defaults."""
     raw = dict(raw)
@@ -390,6 +412,7 @@ def build_config(raw: dict) -> dict:
     cfg["repositories"] = _repositories(open_values.get("repositories", {}))
     _check_tools(cfg)
     _check_names_file(cfg)
+    _check_currency(cfg)
     return cfg
 
 

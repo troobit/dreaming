@@ -10,7 +10,8 @@ SQLite's WAL mode covers their writes while a dream runs.
 Retrieval returns retained revisions only; a running dream's revisions are
 proposals until it ends (`knowledge.retained`). By default it returns active
 knowledge that applies to the query's scope and still has its support, and
-learning recommendations that are open; `include` asks for the rest. Items are
+learning recommendations that are open; `include` asks for the rest, and for
+currency notes (16.4), which are never returned unasked. Items are
 ordered by scope specificity, confidence, latest support and id, and added
 until the next would exceed the limit in estimated tokens, `utf8_bytes/4` of
 the item's compact JSON.
@@ -25,7 +26,16 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import IO
 
-from dreaming import config, exchange, knowledge, run, sessions, store
+from dreaming import (
+    config,
+    currency,
+    exchange,
+    knowledge,
+    research,
+    run,
+    sessions,
+    store,
+)
 from dreaming.backends import estimate_tokens
 from dreaming.errors import SUCCESS, USAGE_ERROR, DreamingError, Rejected
 
@@ -45,6 +55,7 @@ INCLUDE = (
     "withheld",
     "deferred",
     "addressed",
+    "currency_note",
 )
 OUTCOMES = ("success", "failure", "unknown")
 BASES = ("user_confirmed", "check_confirmed", "unknown")
@@ -219,6 +230,52 @@ class _Library:
             entry["research"] = _research(self.conn, json.loads(row["research"]))
         return entry
 
+    def currency_note(self, row: Mapping) -> dict:
+        """A currency finding: current practice for a target, with its sources,
+        never evidence about the user (15.2, 16.4). Its scope is the target's
+        repository."""
+        sources = json.loads(row["sources"])
+        name, _ = config.split_target(row["target"])
+        entry = self.cfg["repositories"].get(name)
+        path = str(Path(entry["path"]).expanduser()) if entry else None
+        count = currency.independent(sources)
+        return {
+            "type": "currency_note",
+            "id": row["id"],
+            "revision": None,
+            "kind": "currency_note",
+            "status": row["status"],
+            "content": row["claim"],
+            "target": row["target"],
+            "assessment": row["assessment"],
+            "scope": {
+                "domains": [],
+                "projects": [path] if path else [],
+                "workflows": [],
+                "global": False,
+                "unresolved": path is None,
+            },
+            "confidence": "low",
+            "confidence_basis": f"{count} independent sources; not about the user",
+            "latest_support_date": max(
+                (s["retrieved_on"] for s in sources if s.get("retrieved_on")),
+                default=None,
+            ),
+            "pending_reassessment": False,
+            "imported": False,
+            "withheld": False,
+            "sources": [{key: s[key] for key in research.CITED} for s in sources],
+        }
+
+    def currency_rows(self, finding_id: str | None = None) -> list[sqlite3.Row]:
+        """Currency findings from ended runs, like retained revisions."""
+        return self.conn.execute(
+            "SELECT f.* FROM currency_findings f LEFT JOIN runs u ON u.id = f.run"
+            f" WHERE (f.run IS NULL OR u.status IN {knowledge.RETAINED_RUNS})"
+            " AND (:id IS NULL OR f.id = :id) ORDER BY f.id",
+            {"id": finding_id},
+        ).fetchall()
+
     def learning_rows(self, learning_id: str | None = None) -> list[sqlite3.Row]:
         """Recommendations from ended runs (or none), like retained revisions."""
         return self.conn.execute(
@@ -248,6 +305,11 @@ class _Library:
             status = knowledge.learning_disposition(row, self.today)
             if shown(status, "open", json.loads(row["scope"])):
                 found.append(self.learning(row, evidence=evidence))
+        if "currency_note" in include:
+            for row in self.currency_rows():
+                note = self.currency_note(row)
+                if row["status"] == "note" and shown("note", "note", note["scope"]):
+                    found.append(note)
         found = [e for e in found if not e["withheld"] or "withheld" in include]
         return sorted(found, key=knowledge.retrieval_key)
 
@@ -304,6 +366,9 @@ def get(conn: sqlite3.Connection, cfg: dict, request: Mapping, now) -> dict:
     rows = library.learning_rows(item_id)
     if rows:
         return {"item": library.learning(rows[0])}
+    rows = library.currency_rows(item_id)
+    if rows:
+        return {"item": library.currency_note(rows[0])}
     raise DreamingError(
         f"no retained knowledge item {item_id}", USAGE_ERROR, "not_found"
     )
@@ -542,6 +607,7 @@ def import_(conn: sqlite3.Connection, cfg: dict, request: Mapping, now) -> dict:
 # Dreams (1.1, 1.6, 5.4, 14.1)
 
 SELECTION_KEYS = ("since", "until", "project", "reread", "scope")
+KINDS = ("dream", "currency")
 DREAM_SCOPE_KEYS = ("project", "workflow")
 
 
@@ -595,13 +661,21 @@ def _started(started: run.Started) -> dict:
 
 def dream_start(conn: sqlite3.Connection, cfg: dict, request: Mapping, now) -> dict:
     """Start a dream in a detached process that keeps running when the caller
-    goes away, or resume the interrupted one (1.1, 1.6)."""
+    goes away, or resume the interrupted one (1.1, 1.6). `kind` is `dream`, or
+    `currency` for a currency review, which reads no sessions (16.1)."""
+    kind = request.get("kind", "dream")
+    if kind not in KINDS:
+        raise _invalid(f"kind is one of {', '.join(KINDS)}")
+    selection = _selection(request)
+    if kind == "currency" and selection:
+        raise _invalid("a currency review reads no sessions and takes no selection")
     started = run.start(
         config.dreaming_home(),
         cfg,
-        selection=_selection(request),
+        selection=selection,
         overrides=_object(request, "overrides"),
         requester=_text(request, "requester", required=False) or "user",
+        kind=kind,
     )
     return _started(started)
 

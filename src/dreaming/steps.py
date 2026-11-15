@@ -93,6 +93,26 @@ def add(conn: sqlite3.Connection, run_id: str, new: Iterable[NewStep]) -> None:
         )
 
 
+def wait_for(
+    conn: sqlite3.Connection, run_id: str, key: str, keys: Iterable[str]
+) -> None:
+    """Make a pending step also wait for `keys`, steps added later in the same
+    transaction, as a currency review's adoption waits for authoring that its
+    research steps plan as they go."""
+    row = conn.execute(
+        "SELECT depends_on FROM steps WHERE run = ? AND key = ? AND state = 'pending'",
+        (run_id, key),
+    ).fetchone()
+    if row is None:
+        return
+    depends_on = json.loads(row[0])
+    depends_on += [k for k in keys if k not in depends_on]
+    conn.execute(
+        "UPDATE steps SET depends_on = ? WHERE run = ? AND key = ?",
+        (json.dumps(depends_on), run_id, key),
+    )
+
+
 def next_ready(conn: sqlite3.Connection, run_id: str) -> Step | None:
     """The first pending step whose dependencies have all finished.
 

@@ -13,7 +13,7 @@ Tasks 23–25 of `specs/dreaming/tasks.md`: `adopt.py` (work copies, commits, `A
 ## Replay gate (`replay.ReplayGate`, 9.16–9.18)
 
 - `adopt.replay_target(conn, cfg, change)`: `None` unless the change cites an observation row. Lens or role-prompt targets (`instructions/lenses.toml` → `reader`, `instructions/roles/<role>.md` → `<role>`) count only in the repository whose path equals `instructions.repo`. Otherwise, any skill/rule/`CLAUDE.md`/`AGENTS.md` path gives `opening`.
-- `AdoptPhase(replay=None)` holds every replayable change ("no replayer is set up"). `run.PHASES` is still empty; task 31 must pass `ReplayGate(instructions, snapshot_root, apsis)`.
+- `AdoptPhase(replay=None)` holds every replayable change ("no replayer is set up"). A real run gets `ReplayGate(instructions, snapshot_root, apsis)` from `run.wiring`.
 - Sessions come from `knowledge.COUNTED_OBSERVATIONS` by the change's pattern or cited evidence, newest first. Forgotten, dismissed and imported evidence never appear. Each session's quotes go to the judge as `evidence`.
 - Opening replays: `opening_prompt` is the first user entry. A block flagged `truncated`/`missing`/`incomplete`, or no user entry at all (Codex exec), makes the session unreplayable. The with-change instruction is `git show <commit_sha>:<path>` for each edited path, each under a `# <path>` heading.
 - Reader replays use the latest `done` Read step for `observe.read_key(source, id)` from any run: its `input_ref`, the session reopened through `observe.open_session`, and the scope of the run that made it. The "with" prompts come from a temporary copy of `root` with the changed `instructions/` files written in.

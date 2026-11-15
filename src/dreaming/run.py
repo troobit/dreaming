@@ -94,6 +94,7 @@ def create_run(
     run_id: str,
     cfg: dict,
     *,
+    kind: str = "dream",
     status: str = "running",
     requester: str = "user",
     revision: str | None = None,
@@ -104,11 +105,12 @@ def create_run(
     started_at: str | None = None,
 ) -> None:
     conn.execute(
-        "INSERT INTO runs (id, requester, status, revision, started_at, process_group,"
-        " selection, overrides, budget, snapshot_path)"
-        " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO runs (id, kind, requester, status, revision, started_at,"
+        " process_group, selection, overrides, budget, snapshot_path)"
+        " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         (
             run_id,
+            kind,
             requester,
             status,
             revision or versions.revision(),
@@ -698,6 +700,7 @@ def _new_run(
     selection: dict,
     overrides: dict,
     requester: str,
+    kind: str,
 ) -> str:
     effective = config.apply_overrides(cfg, overrides)
     run_id = new_run_id(SystemClock().now())
@@ -710,6 +713,7 @@ def _new_run(
         conn,
         run_id,
         effective,
+        kind=kind,
         requester=requester,
         selection=selection,
         overrides=overrides,
@@ -801,10 +805,12 @@ def start(
     child: Sequence[str] | None = None,
     resume: bool = False,
     run_id: str | None = None,
+    kind: str = "dream",
 ) -> Started:
     """Start a dream, or resume the unfinished one, in a detached process (1.1,
     1.6). With `resume` or a `run_id`, only resume. Exits 4 without changing
-    anything when a dream is running."""
+    anything when a dream is running. A `currency` run reviews the configured
+    targets and reads no sessions (16.1); a resumed run keeps its kind."""
     selection = selection or {}
     overrides = overrides or {}
     fd = acquire_lock(home)
@@ -818,7 +824,9 @@ def start(
                 if resume or run_id is not None:
                     _check_resumable(conn, row, run_id)
                 if row is None:
-                    run_id = _new_run(conn, home, cfg, selection, overrides, requester)
+                    run_id = _new_run(
+                        conn, home, cfg, selection, overrides, requester, kind
+                    )
                 else:
                     run_id = row["id"]
                     overrides = _resume(conn, row, selection, overrides)
@@ -878,6 +886,8 @@ def status(conn: sqlite3.Connection, run_id: str | None = None) -> dict:
 
 # Rows a run wrote, removed when it is discarded; children before parents.
 _RUN_ROWS = (
+    ("fetched_pages", "run"),
+    ("currency_findings", "run"),
     ("replays", "run"),
     ("adoption", "run"),
     ("changes", "run"),
@@ -1021,22 +1031,26 @@ def dry_run(
     overrides: dict | None = None,
     apsis: sessions.Apsis | None = None,
     now: datetime | None = None,
+    kind: str = "dream",
 ) -> dict:
     """What a start would read and use, with no model call and no change to any
     file or row: the store is read through an in-memory copy, and backends are
-    shown from `--version` and the probe cache."""
+    shown from `--version` and the probe cache. A currency review lists its
+    targets and reads no sessions (16.1)."""
     cfg = config.apply_overrides(cfg, overrides or {})
     conn = store.memory_copy(store.store_path(home))
     try:
         unfinished = _unfinished(conn)
-        chosen = sessions.select_sessions(
-            conn,
-            apsis or sessions.Apsis.from_config(cfg, home),
-            cfg,
-            sessions.SelectionRequest.from_dict(selection or {}),
-            home=home,
-            now=now,
-        )
+        chosen = sessions.Selection()
+        if kind == "dream":
+            chosen = sessions.select_sessions(
+                conn,
+                apsis or sessions.Apsis.from_config(cfg, home),
+                cfg,
+                sessions.SelectionRequest.from_dict(selection or {}),
+                home=home,
+                now=now,
+            )
     finally:
         conn.close()
     statuses: dict[str, probe.ProbeResult] = {}
@@ -1075,17 +1089,49 @@ def dry_run(
         ],
         "roles": roles,
         "budget": cfg["budget"],
+        "kind": kind,
+        "targets": cfg["currency"]["targets"] if kind == "currency" else [],
     }
 
 
 # The detached child
 
-# Handlers by phase, the planner that creates a new run's first steps and the
-# report. The modules for each phase fill these in. Backends are probed on first
-# use (`ProbedBackends`).
-PHASES: dict[str, Phase] = {}
-PLANNER: Planner | None = None
-REPORT: Report | None = None
+
+def wiring(home: Path, row: Mapping, cfg: dict) -> tuple[dict, Planner, Report]:
+    """A run's handlers by phase, the planner of its first steps and its report,
+    by the run's kind: a currency review researches its targets and reads no
+    sessions (16.1). Every phase uses the run's snapshot of the instruction set
+    (7.3). Backends are probed on first use (`ProbedBackends`)."""
+    # These modules import this one.
+    from dreaming import (
+        adopt,
+        author,
+        currency,
+        observe,
+        replay,
+        report,
+        research,
+        review,
+        roles,
+    )
+
+    root = Path(row["snapshot_path"]) / "instructions"
+    instructions = roles.load(root, cfg)
+    apsis = sessions.Apsis.from_config(cfg, home)
+    phases: dict[str, Phase] = {
+        "author": author.AuthorPhase(instructions),
+        "adopt": adopt.AdoptPhase(replay.ReplayGate(instructions, root, apsis)),
+    }
+    if row["kind"] == "currency":
+        phases["research"] = currency.CurrencyPhase(instructions)
+        planner: Planner = currency.plan
+    else:
+        reading = observe.ReadPhase(instructions, apsis)
+        phases["read"] = reading
+        phases["review"] = review.ReviewPhase(instructions)
+        phases["research"] = research.ResearchPhase(instructions)
+        planner = reading.plan
+    return phases, planner, report.Writer(home, cfg)
 
 
 def child_main(argv: list[str] | None = None) -> int:
@@ -1108,15 +1154,25 @@ def child_main(argv: list[str] | None = None) -> int:
         log(f"dream {args.run_id} does not exist")
         return FAILURE
     cfg = run_config(row)
+    try:
+        phases, planner, report = wiring(home, row, cfg)
+    except DreamingError as exc:
+        # Left `interrupted` with the reason, so it can be discarded (Q85).
+        conn.execute(
+            "UPDATE runs SET status = 'interrupted', error = ? WHERE id = ?",
+            (exc.message, args.run_id),
+        )
+        log(f"dream {args.run_id} interrupted: {exc.message}")
+        return FAILURE
     runner = Runner(
         conn,
         home,
         args.run_id,
         cfg,
-        phases=PHASES,
+        phases=phases,
         backends=ProbedBackends(conn, home, cfg, args.run_id),
-        planner=PLANNER,
-        report=REPORT,
+        planner=planner,
+        report=report,
     )
     for signum in (signal.SIGTERM, signal.SIGINT):
         signal.signal(signum, lambda *_: runner.stop())

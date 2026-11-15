@@ -429,6 +429,38 @@ ALTER TABLE file_findings ADD COLUMN imported INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE learning ADD COLUMN imported INTEGER NOT NULL DEFAULT 0;
 """
 
+# Currency review (16.x): each page the program fetched to check a relied-on
+# passage, with its title, link and retrieval date, or why it could not be read;
+# a finding's assessment; and the currency finding a candidate rests on. The
+# tooling inventory (8.x): the tools, skills and first-request context a session
+# showed when it was read, and a run's inventory as it ended.
+_SCHEMA_V7 = """
+CREATE TABLE fetched_pages (
+    run TEXT NOT NULL REFERENCES runs (id),
+    target TEXT,
+    link TEXT NOT NULL,
+    title TEXT,
+    retrieved_on TEXT,
+    text TEXT,
+    error TEXT,
+    created_at TEXT NOT NULL,
+    PRIMARY KEY (run, link)
+);
+
+ALTER TABLE currency_findings ADD COLUMN assessment TEXT;
+ALTER TABLE candidates ADD COLUMN currency_finding_id TEXT;
+ALTER TABLE sessions_seen ADD COLUMN inventory TEXT;
+ALTER TABLE runs ADD COLUMN inventory TEXT;
+"""
+
+# What selection could not attribute, kept by the planner for the report:
+# sources and projects under the unassigned domain (2.3), origins counted as
+# interactive because nothing maps them (2.9), and listing and unattributed
+# server warnings (2.4).
+_SCHEMA_V8 = """
+ALTER TABLE runs ADD COLUMN selection_notes TEXT;
+"""
+
 MIGRATIONS: list[str] = [
     _SCHEMA_V1,
     _SCHEMA_V2,
@@ -436,6 +468,8 @@ MIGRATIONS: list[str] = [
     _SCHEMA_V4,
     _SCHEMA_V5,
     _SCHEMA_V6,
+    _SCHEMA_V7,
+    _SCHEMA_V8,
 ]
 
 

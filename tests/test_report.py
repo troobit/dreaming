@@ -1,7 +1,8 @@
 """The dream report (10.1–10.6, 7.4, 12.3, 15.2, 16.2).
 
-Until adoption, effect measurement and the tooling inventory land, their
-sections show an empty state; those tasks test their own sections.
+The changes, effect and tooling inventory sections are tested with the tasks
+that fill them in (test_adopt, test_effect, test_inventory); here they show
+their empty states.
 """
 
 import json
@@ -40,7 +41,7 @@ from runkit import (
     run_row,
 )
 
-from dreaming import config, report
+from dreaming import cli, config, report
 from dreaming.errors import DreamingError, Partial
 from dreaming.report import sections, shell
 
@@ -154,6 +155,20 @@ def test_a_browser_failure_never_fails_the_dream(
     assert "Traceback" not in output.err
 
 
+def test_dream_report_open_opens_the_page_on_request(db, home, browser, capsys):
+    """The skill opens an earlier report through `dream report --open`; the
+    request is explicit, so `report.open_browser` does not apply (10.1)."""
+    cfg = fake_config()
+    cfg["report"]["open_browser"] = False
+    dream(db)
+    path = report.write(db, RUN, home, cfg)
+    assert cli.main(["report", RUN]) == 0
+    assert browser == []
+    assert cli.main(["report", "--open"]) == 0
+    assert browser == [path.as_uri()]
+    assert capsys.readouterr().out.splitlines() == [str(path), str(path)]
+
+
 def test_an_unknown_dream_has_no_report(db):
     with pytest.raises(DreamingError) as raised:
         page(db, "dream-missing")
@@ -245,6 +260,62 @@ def test_statistics_count_sessions_observations_patterns_changes_and_use(db):
     ) in stats
 
 
+# Sources and integrations (2.3, 2.4, 2.9, 14.4)
+
+
+def test_unavailable_integrations_and_selection_notes_are_listed(db, tmp_path):
+    cfg = fake_config()
+    cfg["knowledge_folders"] = [str(tmp_path / "gone-notes")]
+    cfg["tools"]["researcher"] = ["read", "devtools.fetch_url"]
+    dream(db)
+    notes = {
+        "unmapped_domains": [["claude", "/work/unmapped"]],
+        "unmapped_origins": [["claude", "mystery-client"]],
+        "warnings": [{"code": "unreadable", "message": "a log was unreadable"}],
+        "server_warnings": [{"source": "lmstudio", "text": "model unloaded"}],
+    }
+    db.execute("UPDATE runs SET selection_notes = ?", (json.dumps(notes),))
+    for outcome, error in (("unavailable", "LM Studio refused"), ("ok", None)):
+        db.execute(
+            "INSERT INTO calls (run, step_key, attempt, role, backend, outcome,"
+            " error, started_at) VALUES (?, 'probe:local', 1, 'probe', ?, ?, ?, ?)",
+            (
+                RUN,
+                "local" if outcome == "unavailable" else "claude",
+                outcome,
+                error,
+                NOW,
+            ),
+        )
+    body = section(page(db, cfg=cfg), "sources")
+    for shown in (
+        "backend local",
+        "LM Studio refused",
+        f"knowledge folder {tmp_path / 'gone-notes'}",
+        "devtools.fetch_url for the researcher",
+        "no shared MCP definitions are configured",
+        "/work/unmapped",
+        "mystery-client",
+        "a log was unreadable",
+        "model unloaded",
+    ):
+        assert shown in body
+    assert "backend claude" not in body
+
+
+def test_a_backend_usable_again_after_a_resume_is_not_listed(db):
+    cfg = fake_config()
+    cfg["tools"]["researcher"] = ["read"]
+    dream(db)
+    for outcome in ("unavailable", "ok"):
+        db.execute(
+            "INSERT INTO calls (run, step_key, attempt, role, backend, outcome,"
+            " started_at) VALUES (?, 'probe:local', 1, 'probe', 'local', ?, ?)",
+            (RUN, outcome, NOW),
+        )
+    assert section(page(db, cfg=cfg), "sources") is None
+
+
 # Knowledge, learning and changes kept apart (10.6, 15.2)
 
 
@@ -318,7 +389,7 @@ def test_effect_and_inventory_show_an_empty_state(db):
     dream(db)
     change(db, "ch1", "Add a rule")
     html = page(db)
-    assert "not available yet" in section(html, "effect")
+    assert "No change has been applied yet." in section(html, "effect")
     assert "not measured yet" in section(html, "inventory")
 
 

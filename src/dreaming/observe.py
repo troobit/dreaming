@@ -18,13 +18,14 @@ from collections.abc import Mapping, Sequence
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
-from dreaming import config, knowledge, roles, sessions, steps
+from dreaming import config, inventory, knowledge, roles, sessions, steps
 from dreaming.backends import Backend, BackendError, estimate_tokens
 from dreaming.errors import DreamingError, Rejected
 from dreaming.redact import redact
 from dreaming.run import Context, Outcome
 from dreaming.schema import validate
 from dreaming.steps import NewStep, Step
+from dreaming.store import transaction
 
 REVIEW_KEY = "review"
 CHECK_BLOCKS = ("tool_result",)
@@ -303,7 +304,9 @@ class ReadPhase:
 
     def plan(self, ctx: Context) -> list[NewStep]:
         """A new run's steps: one Read step per selected session or session that
-        could not be parsed (2.7), and the Review step after all of them."""
+        could not be parsed (2.7), and the Review step after all of them. The
+        run keeps what selection could not attribute for the report (2.3, 2.4,
+        2.9), and evidence is marked by what became of its source (13.7)."""
         chosen = sessions.select_sessions(
             ctx.conn,
             self.apsis,
@@ -313,6 +316,12 @@ class ReadPhase:
             run_id=ctx.run_id,
             now=ctx.clock.now(),
         )
+        with transaction(ctx.conn):
+            sessions.mark_availability(ctx.conn, chosen.listed)
+            ctx.conn.execute(
+                "UPDATE runs SET selection_notes = ? WHERE id = ?",
+                (json.dumps(chosen.notes()), ctx.run_id),
+            )
         planned = [
             NewStep(read_key(s.source, s.id), "read", input_ref=json.dumps(ref))
             for s, ref in ((s, _session_ref(s)) for s in chosen.sessions)
@@ -409,7 +418,11 @@ class ReadPhase:
                     model=answer.model,
                 )
         sessions.record_session(
-            conn, step.run, result.session, lens_versions=result.lenses
+            conn,
+            step.run,
+            result.session,
+            lens_versions=result.lenses,
+            inventory=inventory.session_use(result.session),
         )
         return Outcome()
 
