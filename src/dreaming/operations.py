@@ -73,6 +73,8 @@ def lifecycle(config, request, *, home=None):
             "fallback_on_usage_limit",
             "open_browser",
             "dry_run",
+            "kind",
+            "targets",
         }
     if request.keys() - allowed:
         raise ValueError("Unknown lifecycle fields: " + ", ".join(sorted(request.keys() - allowed)))
@@ -94,7 +96,27 @@ def lifecycle(config, request, *, home=None):
             if field in request and type(request[field]) is not bool:
                 raise ValueError(field + " must be boolean")
         requester = _required_text(request.get("requester", "user"), "requester")
+        kind = request.get("kind", "standard")
+        if kind not in {"standard", "currency"}:
+            raise ValueError("kind must be standard or currency")
+        targets = request.get("targets")
+        if kind == "currency":
+            if request.get("dry_run"):
+                raise ValueError("dry_run does not apply to a currency dream")
+            known = {t["name"] for t in config.currency_targets}
+            if not known or (
+                targets is not None
+                and (not isinstance(targets, list) or not targets or set(targets) - known)
+            ):
+                raise APIError("invalid_scope", "Unknown or unconfigured currency targets")
+        elif targets is not None:
+            raise ValueError("targets apply only to a currency dream")
         overrides = {
+            **(
+                {"kind": kind, **({"targets": targets} if targets else {})}
+                if kind != "standard"
+                else {}
+            ),
             "scope": scope,
             **{
                 k: request[k]
@@ -220,9 +242,11 @@ def work(store, run_id):
         },
     )
     overrides = json.loads(record["overrides"])
+    currency = overrides.get("kind") == "currency"
 
     def finalize(s, rid):
         from dreaming.adopt import cleanup_worktrees, reconcile_merges, render_changes
+        from dreaming.effect import render_effect
 
         reconcile_merges(s, rid)
         cleanup_worktrees(s, rid)
@@ -230,7 +254,10 @@ def work(store, run_id):
             s,
             rid,
             open_browser=overrides.get("open_browser", True),
-            sections={"changes": render_changes(s, rid, config)},
+            sections={
+                "changes": render_changes(s, rid, config),
+                "effect": render_effect(s, config),
+            },
         )
 
     try:
@@ -242,7 +269,14 @@ def work(store, run_id):
         has_steps = store.connection.execute(
             "SELECT 1 FROM steps WHERE run_id=?", (run_id,)
         ).fetchone()
-        if not has_steps and not stats.get("selection_initialized"):
+        if currency:
+            from dreaming.currency import schedule_currency
+            from dreaming.sessions import Selection
+
+            selection = Selection((), (), ())
+            if not has_steps:
+                schedule_currency(store, run_id, config, overrides.get("targets"))
+        elif not has_steps and not stats.get("selection_initialized"):
             selection = select_sessions(
                 client,
                 store,
@@ -294,7 +328,7 @@ def work(store, run_id):
             )
         else:
             selection = restore_selection(store, config, roles, client, record)
-        if not has_steps:
+        if not has_steps and not currency:
             schedule_reads(store, run_id, selection)
         backends = {
             name: (
@@ -311,6 +345,17 @@ def work(store, run_id):
         )
         from dreaming.adopt import AdoptHandler
 
+        if currency:
+            from dreaming.currency import CurrencyAuthorHandler, CurrencyResearchHandler
+
+            handlers = {
+                "Research": CurrencyResearchHandler(store, run_id, config, roles),
+                "Author": CurrencyAuthorHandler(store, run_id, config, roles),
+                "Adopt": AdoptHandler(store, run_id, config, dispatcher=dispatcher, roles=roles),
+            }
+            return Engine(
+                store, run_id, handlers, dispatcher=dispatcher, finalize=finalize
+            ).execute()
         handlers = {
             "Read": ReadHandler(store, run_id, config, roles, selection.sessions),
             "Review": PipelineReview(

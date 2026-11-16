@@ -359,3 +359,22 @@ def test_reader_role_replays_do_not_count_as_sessions_read(report_store):
     page = render_report(report_store, "dream-one")
     assert "<td>Sessions read</td><td>0</td>" in page
     assert "<td>Sessions split</td><td>0</td>" in page
+
+
+def test_report_lists_source_warnings_escaped_without_entry_text(report_store):
+    from dreaming.report import render_report
+
+    diagnostics = [
+        {"code": "source_unavailable", "source": "codex", "message": "<b>not installed</b>"},
+        {"code": "unmapped_origin", "source": "claude", "origin": "x"},
+        {"entry": "private transcript text"},
+    ]
+    report_store.connection.execute(
+        "UPDATE runs SET statistics=json_set(statistics,'$.selection_diagnostics',json(?)) "
+        "WHERE id='dream-one'",
+        (json.dumps(diagnostics),),
+    )
+    page = render_report(report_store, "dream-one")
+    assert "source_unavailable" in page and "unmapped_origin" in page
+    assert "&lt;b&gt;not installed" in page and "<b>not installed" not in page
+    assert "private transcript text" not in page

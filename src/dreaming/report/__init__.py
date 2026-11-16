@@ -140,6 +140,16 @@ def _statistics(store, run):
         for s in stats.get("selection_skipped", [])
         if isinstance(s, dict)
     )
+    # Unavailable optional sources and integrations are reported, never blocking (14.4).
+    warnings = [
+        (d.get("source", ""), d["code"], d.get("message", ""))
+        for d in stats.get("selection_diagnostics", [])
+        if isinstance(d, dict) and isinstance(d.get("code"), str)
+    ]
+    if warnings:
+        result += "<h3>Source and integration warnings</h3>" + _table(
+            ("Source", "Code", "Message"), warnings
+        )
     if issues:
         result += "<h3>Session outcomes</h3>" + _table(
             ("Source", "Session", "State", "Reason"), issues
@@ -275,9 +285,15 @@ def _source(source):
 
 def _currency(store, rid):
     rows = _rows(store, "SELECT * FROM currency_findings WHERE run_id=? ORDER BY id", (rid,))
-    if not rows:
+    skipped = _rows(
+        store,
+        "SELECT url,reason FROM currency_pages "
+        "WHERE run_id=? AND status='unavailable' ORDER BY url",
+        (rid,),
+    )
+    if not rows and not skipped:
         return '<p class="muted">No currency notes or changes in this dream.</p>'
-    return "".join(
+    cards = "".join(
         '<article class="change-card">'
         f"<h3>{_escape(row['claim'])}</h3><p>{_escape(row['target'])} · "
         f"{_escape(row['status'])}</p><ul>"
@@ -285,6 +301,16 @@ def _currency(store, rid):
         + "</ul></article>"
         for row in rows
     )
+    if skipped:
+        cards += (
+            "<p>Sources skipped:</p><ul>"
+            + "".join(
+                f"<li>{_source(dict(title=r['url'], url=r['url']))} · {_escape(r['reason'])}</li>"
+                for r in skipped
+            )
+            + "</ul>"
+        )
+    return cards
 
 
 def _replays(store, rid):

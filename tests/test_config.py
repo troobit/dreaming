@@ -161,3 +161,20 @@ def test_invalid_lenses(tmp_path, content):
     path.write_text(content)
     with pytest.raises(ConfigError):
         load_lenses(path)
+
+
+def test_currency_targets_need_a_repository_kind_and_paths(tmp_path):
+    from dreaming.config import ConfigError, load_config
+
+    repos = {"skills": {"path": str(tmp_path / "skills")}}
+    target = {"name": "t", "repository": "skills", "kind": "skill", "paths": ["a.md"]}
+    config = load_config(
+        tmp_path / "c.toml", overrides={"repositories": repos, "currency_targets": [target]}
+    )
+    assert config.currency_targets[0]["repo"] == str(tmp_path / "skills")
+    for bad in ({"kind": "tool"}, {"repository": "none"}, {"paths": []}):
+        with pytest.raises(ConfigError):
+            load_config(
+                tmp_path / "c.toml",
+                overrides={"repositories": repos, "currency_targets": [{**target, **bad}]},
+            )

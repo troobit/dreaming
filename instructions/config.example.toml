@@ -66,3 +66,12 @@ local = false
 [scan]
 # names_file = "/private/path/outside/all/git/repositories/names.txt"
 quote_chars = 80
+
+# Currency review (dream start --kind currency) checks these targets against current sources.
+# [repositories.skills]
+# path = "/absolute/path/to/skills"
+# [[currency_targets]]
+# name = "review-skill"
+# repository = "skills"
+# kind = "skill"
+# paths = ["review/SKILL.md"]

@@ -654,9 +654,19 @@ def discard(store, record, *, config=None):
             "adoption",
             "learning",
             "review_decisions",
-            "currency_findings",
+            "currency_pages",
         ):
             conn.execute(f"DELETE FROM {table} WHERE run_id=?", (rid,))
+        # A finding whose branch was deleted unmerged stays on record, so it is not proposed
+        # again without a new independent source (16.6); other findings go with the run.
+        conn.execute(
+            "UPDATE currency_findings SET status='branch_deleted' WHERE run_id=? "
+            "AND status='proposed'",
+            (rid,),
+        )
+        conn.execute(
+            "DELETE FROM currency_findings WHERE run_id=? AND status<>'branch_deleted'", (rid,)
+        )
         conn.execute("UPDATE patterns SET last_reviewed_run=NULL WHERE last_reviewed_run=?", (rid,))
         conn.execute(
             "UPDATE runs SET status='discarded',process_group=NULL,"

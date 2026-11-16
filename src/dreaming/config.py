@@ -171,6 +171,7 @@ class Config:
     repositories: dict = field(default_factory=dict)
     scan: dict = field(default_factory=dict)
     knowledge_folders: tuple[str, ...] = ()
+    currency_targets: tuple[dict, ...] = ()
 
     def locality(self, provider: str | None, model: str | None) -> str:
         for rule in self.classification:
@@ -276,6 +277,7 @@ def load_config(path: Path | None = None, *, overrides: dict | None = None) -> C
         "domains",
         "repositories",
         "knowledge_folders",
+        "currency_targets",
     }
     if raw.keys() - known:
         raise ConfigError(f"Unknown config settings: {sorted(raw.keys() - known)}")
@@ -393,6 +395,7 @@ def load_config(path: Path | None = None, *, overrides: dict | None = None) -> C
             _strings(repo.get(command, []), f"repositories.{name}.{command}")
         if type(repo.get("public", False)) is not bool:
             raise ConfigError(f"repositories.{name}.public must be a boolean")
+    targets = _currency_targets(raw.get("currency_targets", []), repos)
     return Config(
         source,
         _settings(Budget, raw.get("budget", {})),
@@ -413,7 +416,30 @@ def load_config(path: Path | None = None, *, overrides: dict | None = None) -> C
             str(path_setting(p))
             for p in _strings(raw.get("knowledge_folders", []), "knowledge_folders")
         ),
+        targets,
     )
+
+
+def _currency_targets(raw: object, repos: dict) -> tuple[dict, ...]:
+    """Targets name a repository entry and the skill, rule or workflow files it holds."""
+    if not isinstance(raw, list):
+        raise ConfigError("currency_targets must be an array of tables")
+    targets = []
+    for item in raw:
+        item = _table(item, "currency_target")
+        if item.keys() - {"name", "repository", "kind", "paths"}:
+            raise ConfigError("Unknown currency target settings")
+        name = item.get("name")
+        repo = repos.get(item.get("repository"), {})
+        if not isinstance(name, str) or not name or any(t["name"] == name for t in targets):
+            raise ConfigError("Currency targets need unique nonempty names")
+        if not repo.get("path"):
+            raise ConfigError(f"Currency target {name} needs a repository with a path")
+        if item.get("kind") not in {"skill", "rule", "workflow"}:
+            raise ConfigError(f"Currency target {name} kind must be skill, rule or workflow")
+        paths = _strings(item.get("paths"), f"currency_targets.{name}.paths", nonempty=True)
+        targets.append({"name": name, "repo": repo["path"], "kind": item["kind"], "paths": paths})
+    return tuple(targets)
 
 
 def load_lenses(path: Path) -> tuple[Lens, ...]:

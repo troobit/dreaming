@@ -79,6 +79,8 @@ def main(argv: list[str] | None = None) -> int:
     for name in ("project", "workflow", "domain", "since", "until"):
         start.add_argument("--" + name)
     start.add_argument("--reread", action="store_true")
+    start.add_argument("--kind", choices=("standard", "currency"))
+    start.add_argument("--targets", type=json.loads, help="JSON list of currency target names")
     start.add_argument("--dry-run", action="store_true")
     start.add_argument("--requester", default="user")
     start.add_argument("--backends", type=json.loads)

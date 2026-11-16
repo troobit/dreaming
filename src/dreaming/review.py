@@ -5,6 +5,7 @@ from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 
 from dreaming.backends import input_tokens
+from dreaming.effect import pattern_effects
 from dreaming.knowledge import (
     KnowledgeRules,
     _rows,
@@ -24,7 +25,7 @@ from dreaming.reader import clusters
 from dreaming.steps import Step
 
 
-def _summary(store, cluster, signals, quote_limit=8):
+def _summary(store, cluster, signals, quote_limit=8, effect=None):
     rows = cluster["observations"]
     representatives = {}
     for row in rows:
@@ -72,6 +73,7 @@ def _summary(store, cluster, signals, quote_limit=8):
             for row in examples
         ],
         evidence_omitted=max(0, len(rows) - quote_limit),
+        **({"effect": effect} if effect else {}),
         changes=_rows(
             store.connection.execute(
                 "SELECT id,status,applied_at,reverted_at FROM changes "
@@ -92,6 +94,7 @@ def review_context(store, run_id, config, roles, *, scope=None, now=None):
         if r["pattern_id"] and not r["imported"] and in_scope(r, scope)
     ]
     ranked = rank_patterns(store, config, now=now, run_id=run_id)
+    effects = pattern_effects(store, config, now=now)
     signals = {r["id"]: dict(position=i + 1, **r) for i, r in enumerate(ranked)}
     grouped = clusters([*observations, *files])
     quote_limit = max(8, config.thresholds.min_sessions)
@@ -111,7 +114,12 @@ def review_context(store, run_id, config, roles, *, scope=None, now=None):
             c["pattern_id"],
         )
     )
-    existing = [_summary(store, c, signals.get(c["pattern_id"], {}), quote_limit) for c in grouped]
+    existing = [
+        _summary(
+            store, c, signals.get(c["pattern_id"], {}), quote_limit, effects.get(c["pattern_id"])
+        )
+        for c in grouped
+    ]
     existing.sort(key=lambda c: (c["signals"].get("position", 10**9), c["pattern_id"]))
     visible = {r["id"] for r in observations}
     knowledge = []

@@ -9,3 +9,8 @@ the claim used and a verbatim supporting passage for each web source. A source
 that cannot be fetched cannot support a finding. Do not infer independent
 corroboration from duplicated passages or several pages on one domain.
 Never start another agent. Do not change repository files.
+
+For a currency review, every web source also needs the exact passage relied on;
+the program fetches each cited page itself and rejects a finding whose passage is
+not in the stored text. Two sources count as independent only on different
+registrable domains with different passages.
