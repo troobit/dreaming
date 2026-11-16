@@ -432,16 +432,16 @@ references:
     - Stream: 1
     - Requirements: [6.7](requirements.md#6.7), [11.1](requirements.md#11.1), [11.2](requirements.md#11.2), [11.6](requirements.md#11.6)
 
-- [ ] 28. Tooling inventory and context weight <!-- id:w1na5f9 -->
+- [x] 28. Tooling inventory and context weight <!-- id:w1na5f9 -->
   - Blocked-by: w1na5dc (apsis client and contract checks)
   - Stream: 2
   - Requirements: [8.1](requirements.md#8.1), [8.2](requirements.md#8.2)
-  - [ ] 28.1. Write tests for the tooling inventory <!-- id:w1na5fa -->
+  - [x] 28.1. Write tests for the tooling inventory <!-- id:w1na5fa -->
     - MCP servers and tools configured per harness versus used in sessions read, never-used tools, sessions showing a need an available tool could meet; context before the first prompt by instructions, skills and tool schemas labelled measured, estimated or unavailable; flag above the configured share of a known window
     - Blocked-by: w1na5dc (apsis client and contract checks)
     - Stream: 2
     - Requirements: [8.1](requirements.md#8.1), [8.2](requirements.md#8.2)
-  - [ ] 28.2. Implement inventory.py <!-- id:w1na5fb -->
+  - [x] 28.2. Implement inventory.py <!-- id:w1na5fb -->
     - Adds the report's tooling inventory section and its test, extending the report from task 29
     - Reads harness configuration files and shared session documents; largest contributors named
     - Blocked-by: w1na5fa (Write tests for the tooling inventory), w1na5fc (Dream report)

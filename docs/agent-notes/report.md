@@ -21,3 +21,23 @@
   `5d07d2f7f31675709f57b35579f72058e846fa67`, with only attribution, formatting and
   footer changes. `report/UPSTREAM.txt` records that upstream declared no licence
   at inspection; no licence grant is invented. Runtime does not need that repo.
+
+# Tooling inventory (`inventory.py`)
+
+- `inventory_section(store, run_id, config, client, home)` opens the run's read,
+  non-forgotten sessions through the apsis client and returns trusted HTML for the
+  report's `inventory` section. `operations.work` supplies it at finalization; a
+  failure only logs, so it never blocks the report.
+- Configuration is read from `~/.claude.json` (user and per-project `mcpServers`),
+  `~/.claude/settings.json` (`mcp__server__tool` allow rules), `~/.codex/config.toml`
+  (`mcp_servers`, `enabled_tools`), plus `CLAUDE.md`/`AGENTS.md`, `rules/` and skill
+  frontmatter. Tool names are not enumerated by these files, so "configured tools" is
+  often empty; usage supplies the observed ones.
+- Labels: tokens from files are `estimated` (bytes/4; skill listings count only name and
+  description). Tool schemas are estimated only from LM Studio `requests[].parameters.tools`.
+  A `measured` total comes only from a usage block whose basis does not contain `total`
+  (Codex thread totals are cumulative and are not treated as first-prompt context); the
+  smallest value per harness is used as the closest to a bare baseline.
+- Flag: measured, else estimated, total above `thresholds.context_warning_share` times
+  the backend's `context_tokens`. "Need" is deliberately narrow: an MCP call that failed
+  as an unavailable tool while the server is configured only for a different harness.

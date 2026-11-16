@@ -1,6 +1,7 @@
 """Public lifecycle operations; run mutations take the engine's continuous lock."""
 
 import json
+import logging
 import os
 import re
 from dataclasses import asdict, replace
@@ -195,6 +196,7 @@ def work(store, run_id):
     from dreaming.backends.claude import ClaudeBackend
     from dreaming.backends.codex import CodexBackend
     from dreaming.backends.lmstudio import LMStudioBackend
+    from dreaming.inventory import inventory_section
     from dreaming.observe import entry_text
     from dreaming.reader import ReadHandler, schedule_reads
     from dreaming.report import write_report
@@ -226,12 +228,13 @@ def work(store, run_id):
 
         reconcile_merges(s, rid)
         cleanup_worktrees(s, rid)
-        write_report(
-            s,
-            rid,
-            open_browser=overrides.get("open_browser", True),
-            sections={"changes": render_changes(s, rid, config)},
-        )
+        sections = {"changes": render_changes(s, rid, config)}
+        try:
+            reader = ApsisClient(codex_exec_dirs=(s.path.parent / "codex-exec",))
+            sections["inventory"] = inventory_section(s, rid, config, reader)
+        except Exception:
+            logging.getLogger(__name__).warning("Tooling inventory unavailable", exc_info=True)
+        write_report(s, rid, open_browser=overrides.get("open_browser", True), sections=sections)
 
     try:
         from dreaming.adopt import detect_reverts
