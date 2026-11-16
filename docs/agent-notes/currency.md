@@ -19,8 +19,9 @@
   `dismissed` or `branch_deleted` findings, or a committed change whose branch is
   gone and unmerged, are deferred unless a new registrable domain appears.
   `discard` keeps proposed findings as `branch_deleted` instead of deleting them.
-- Adopt step is created by the last Research step to apply (or fail). A research
-  step omitted for budget never schedules Adopt: known gap.
+- Adopt step is created by the last Research step to finish: apply, fail, or be
+  omitted for budget (`CurrencyResearchHandler.omitted`, called by
+  `Engine._omit_for_budget`), so earlier targets' changes are still committed.
 
 # Effect measurement (`effect.py`)
 

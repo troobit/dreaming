@@ -17,6 +17,7 @@ from dreaming.currency import (
     schedule_currency,
 )
 from dreaming.knowledge import pattern_statistics
+from dreaming.observe import identifier
 from dreaming.run import Engine
 from dreaming.steps import CallResult
 
@@ -319,3 +320,47 @@ def test_discarded_currency_branch_stays_suppressed(reader_env, target):  # noqa
     store.connection.execute("UPDATE currency_findings SET status='proposed'")
     discard(store, dict(id="r", process_group=None), config=config)
     assert rows(store, "SELECT status FROM currency_findings") == [("branch_deleted",)]
+
+
+def test_budget_omitted_last_research_step_still_schedules_adopt(
+    reader_env,
+    target,  # noqa: F811
+    monkeypatch,
+):
+    from dreaming.adopt import Adoption
+    from dreaming.budget import RunBudget
+
+    store, config, roles = setup(reader_env, target)
+    config = replace(
+        config,
+        repositories={
+            "target": {**config.repositories["target"], "lint": ["true"], "test": ["true"]}
+        },
+        currency_targets=(
+            *config.currency_targets,
+            dict(name="other", repo=str(target), kind="rule", paths=("rule.md",)),
+        ),
+    )
+    roles.config = config
+    schedule_currency(store, "r", config, names={"other"})
+    ids = [identifier("currency-source", s["url"]) for s in (A, B)]
+    answer = json.loads(authored(evidence_ids=ids))
+    answer["edits"][0]["supporting_evidence"] = ids
+    can_call = RunBudget.can_call
+    monkeypatch.setattr(
+        RunBudget,
+        "can_call",
+        lambda self, role, *, key=None, **kw: (
+            key != "currency-research:other" and can_call(self, role, key=key, **kw)
+        ),
+    )
+    code, _, _ = run(
+        store,
+        config,
+        roles,
+        [researcher(finding(A, B)), CallResult(json.dumps(answer), model="m")],
+    )
+    assert code == 0
+    assert rows(store, "SELECT state FROM steps WHERE phase='Adopt'") == [("done",)]
+    Adoption(store, "r", config).run()
+    assert rows(store, "SELECT commit_sha IS NOT NULL FROM changes") == [(1,)]

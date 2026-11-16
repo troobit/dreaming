@@ -360,6 +360,15 @@ class Engine:
                 self.finalize(self.store, self.run_id)
         return exit_code(status)
 
+    def _omit_for_budget(self, handler, step) -> None:
+        """Complete a step without a model call; a handler may schedule follow-up steps."""
+        omitted = getattr(handler, "omitted", None)
+        self.steps.apply(
+            step.key,
+            '{"omitted":"budget"}',
+            lambda conn, output: omitted(conn, step) if omitted else (),
+        )
+
     def _loop(self) -> str:
         exhausted = False
         while step := self.steps.next():
@@ -416,7 +425,7 @@ class Engine:
                         step.key, sessions
                     )
                     # Complete a model-free omission so the reviewer can use earlier evidence.
-                    self.steps.apply(step.key, '{"omitted":"budget"}', lambda conn, output: None)
+                    self._omit_for_budget(handler, step)
                     continue
                 if self.dispatcher is not None:
                     try:
@@ -435,7 +444,7 @@ class Engine:
                         continue
                 if response.outcome == "budget_exhausted":
                     exhausted = True
-                    self.steps.apply(step.key, '{"omitted":"budget"}', lambda conn, output: None)
+                    self._omit_for_budget(handler, step)
                     continue
                 if response.outcome == "interrupted":
                     return "interrupted"

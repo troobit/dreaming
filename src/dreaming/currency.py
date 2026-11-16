@@ -248,6 +248,10 @@ class CurrencyResearchHandler(_Handler):
         _record(conn, self.run_id, step, "deferred", reason)
         insert_steps(conn, self.run_id, _adopt_steps(conn, self.run_id, step.key))
 
+    def omitted(self, conn, step):
+        """A step skipped for budget may be the last Research step: Adopt must still run."""
+        return _adopt_steps(conn, self.run_id, step.key)
+
     def _branch_deleted(self, conn, finding_id):
         """A committed change whose branch is gone without being merged."""
         from dreaming.adopt import _git_ok
