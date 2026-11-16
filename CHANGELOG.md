@@ -8,6 +8,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- Currency-review dream: research per configured target with program-verified verbatim passages, stored fetched pages, findings committed to the dream branch (never merged), and currency notes returned only on request.
+- Effect measurement with before/after rates, re-candidacy and calibration queries, shown in the report.
+- Tooling inventory and context-weight section in the report, flagging never-used servers and windows over `context_warning_share`.
+- `dream` skill for starting, inspecting and resuming dreams; portable end-to-end test; report lists unavailable-source warnings.
+
 - Detached `dream start` and `resume`, guarded discard, and versioned run/session API operations with registration, forgetting and restoration.
 - Private dream branches with evidence commits, generated files, public-output scans and withheld patches; checked merge commits, linked adoption, deployment rollback and Git-based recovery.
 - Paired instruction replays with live evidence checks, counted model calls, saved-output recovery and one durable result per authoring; fetched-content changes remain on their branches.
