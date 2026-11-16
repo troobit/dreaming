@@ -118,6 +118,7 @@ def snapshot_config(path: Path) -> Config:
         raw[key] = {k: tuple(v) for k, v in raw[key].items()}
     for key in ("classification", "knowledge_folders"):
         raw[key] = tuple(raw[key])
+    raw["currency_targets"] = tuple(raw.get("currency_targets", ()))
     return Config(**raw)
 
 
@@ -225,10 +226,11 @@ class RunSession:
         snapshot = write_snapshot(config, self.lock.home, run_id)
         with self.store.transaction() as conn:
             conn.execute(
-                "INSERT INTO runs(id,status,revision,requester,started_at,selection,"
-                "overrides,budget,snapshot_path) VALUES (?,'running',?,?,?,?,?,?,?)",
+                "INSERT INTO runs(id,kind,status,revision,requester,started_at,selection,"
+                "overrides,budget,snapshot_path) VALUES (?,?,'running',?,?,?,?,?,?,?)",
                 (
                     run_id,
+                    (overrides or {}).get("kind", "standard"),
                     revision,
                     requester,
                     datetime.now(UTC).isoformat(),
