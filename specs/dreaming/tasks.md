@@ -465,16 +465,16 @@ references:
     - Stream: 2
     - Requirements: [10.5](requirements.md#10.5), [12.3](requirements.md#12.3)
 
-- [ ] 30. `dream` agent skill <!-- id:w1na5ff -->
+- [x] 30. `dream` agent skill <!-- id:w1na5ff -->
   - Blocked-by: w1na5er (Run and session operations)
   - Stream: 2
   - Requirements: [1.1](requirements.md#1.1), [10.1](requirements.md#10.1), [14.1](requirements.md#14.1)
-  - [ ] 30.1. Write tests for the skill <!-- id:w1na5fg -->
+  - [x] 30.1. Write tests for the skill <!-- id:w1na5fg -->
     - tests check that skills/dream/SKILL.md exists with valid frontmatter and invokes only the installed `dream` command and `dream api`; `make lint` passes
     - Blocked-by: w1na5er (Run and session operations)
     - Stream: 2
     - Requirements: [14.1](requirements.md#14.1)
-  - [ ] 30.2. Add skills/dream/SKILL.md <!-- id:w1na5fh -->
+  - [x] 30.2. Add skills/dream/SKILL.md <!-- id:w1na5fh -->
     - Start (with dry-run and scope options), inspect, resume and open the report through the installed `dream` command; works from any directory; requester `user`; other harness repositories install the skill by copying this directory
     - Blocked-by: w1na5fg (Write tests for the skill)
     - Stream: 2

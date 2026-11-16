@@ -41,3 +41,13 @@
 - Flag: measured, else estimated, total above `thresholds.context_warning_share` times
   the backend's `context_tokens`. "Need" is deliberately narrow: an MCP call that failed
   as an unavailable tool while the server is configured only for a different harness.
+
+# `dream` skill
+
+- `skills/dream/SKILL.md` is the only file in its directory; other harness repositories
+  install it by copying the directory. `allowed-tools: Bash(dream:*)` and
+  `tests/test_skill.py` enforce that every command in its code blocks is `dream start|run|
+  status|resume` or `echo '<json>' | dream api`. It never passes `--requester`, so the
+  run records requester `user`.
+- The browser opens from the worker at run end (user requester); the skill never opens
+  it itself, it reports `report_path` from `dream status`.
