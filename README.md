@@ -13,9 +13,9 @@ design, decision log and tasks. Implementation notes are in
 
 ## Requirements
 
-- Python 3.12 or newer, [uv](https://docs.astral.sh/uv/) and `git`. Dreaming has
+- Python 3.15 or newer, [uv](https://docs.astral.sh/uv/) and `git`. Dreaming has
   no runtime Python dependencies.
-- `apsis` on `PATH`. It lists and opens the recorded sessions (Claude Code,
+- `apsis` on `PATH`, built from the orbit repository. It lists and opens the recorded sessions (Claude Code,
   Codex, Copilot, Kiro and LM Studio server logs).
 - At least one backend: the `claude` or `codex` CLI, logged in, or an LM Studio
   server with a model loaded. Every role uses `claude` unless configured
@@ -31,11 +31,15 @@ make install
 ```
 
 This builds the committed `HEAD` of the checkout, not the working tree, into
-`~/.dreaming/versions/<revision>/`. It makes that version current and links
+`~/.dreaming/versions/<revision>/` (under `DREAMING_HOME` when set). It makes that version current and links
 `~/.local/bin/dream` to a launcher. An interrupted dream resumes on the version
 it started with, so installing never changes a dream in progress. Versions that
 no unfinished dream needs are removed. During development, `uv run dream` runs
 the checkout instead.
+
+`~/.local/bin` must be on `PATH`. Installing stops if `~/.local/bin/dream`
+exists and is not dreaming's launcher, for example after `uv tool install`;
+remove it and install again.
 
 ## Configure
 
@@ -45,6 +49,13 @@ Copy the example configuration and edit it:
 mkdir -p -m 700 ~/.dreaming
 cp instructions/config.example.toml ~/.dreaming/config.toml
 ```
+
+The example is the author's own setup. `[instructions] repo`,
+`[scan] names_file`, `[mcp] servers_file` and `[repositories.agentic-coding]`
+point at paths on that machine, and `[adoption] auto_apply = true` merges and
+deploys a change once every configured check passes. Change the paths, and
+remove `[repositories.*]` or set `auto_apply = false` until you want a dream
+to change a repository.
 
 Every setting is optional except `[instructions] repo`, which starting a dream
 requires.
@@ -84,6 +95,10 @@ running exits 4 and changes nothing. A dream paused at a provider usage limit is
 `waiting`, and `dream status` shows when it continues. `dream <command> --help`
 lists every option.
 
+If an earlier dream is unfinished, `dream run` resumes it with the selection
+it started with and ignores new selection options. Discard it first to start
+a new one.
+
 The `dream` skill in [`skills/dream/`](skills/dream/SKILL.md) drives these
 commands from an agent harness. Copy the folder into the harness's skills
 folder to install it.
@@ -110,24 +125,31 @@ request):
 {"dreaming_api":1,"op":"knowledge.get","ok":false,"code":"not_found","error":"no retained knowledge item k-0123456789ab"}
 ```
 
+Codes include `invalid_request`, `unknown_op`, `invalid_scope`,
+`incompatible_version` (an API, export or store version this program does not
+know), `not_found`, `stale_version` (a correction's `base_version` is no longer
+current), `run_finished` (resuming or discarding a dream that ended),
+`already_running` (exit 4) and `migration_blocked`.
+
 | Operation | Request fields |
 |---|---|
-| `knowledge.recall` | `scope` (any of `domain`, `project`, `workflow`), optional `include`, `limit` (estimated tokens, default 1000) |
-| `knowledge.search` | `query`, `scope`, optional `include`, `limit` |
+| `knowledge.recall` | `scope` (at least one of `domain`, `project`, `workflow`), optional `include`, `limit` (estimated tokens, default 1000) |
+| `knowledge.search` | `query`, `scope` (as for recall), optional `include`, `limit` |
 | `knowledge.get` | `id` |
-| `knowledge.feedback` | `feedback_id`, `revisions` (`[{"item_id", "version", "use": "cited" or "present_only"}]`), optional `outcome`, `basis`, `check`, `correction`, `learning` |
+| `knowledge.feedback` | `feedback_id` and at least one of `revisions` (`[{"item_id", "version", "use": "cited" or "present_only"}]`), `correction` or `learning`; optional `outcome` (`success`, `failure` or `unknown`; needs `revisions`), `basis` (`user_confirmed`, `check_confirmed` with `check`, or `unknown`), `run_ref`, `session_ref` |
 | `knowledge.export` | none; returns the store's retained knowledge as `export` |
 | `knowledge.import` | `export`, the document a `knowledge.export` returned |
 | `dream.start` | optional `selection` (`since`, `until`, `project`, `reread`, `scope`), `overrides`, `requester`, `kind` (`dream` or `currency`) |
 | `dream.status`, `dream.report`, `dream.resume`, `dream.discard` | optional `run_id`; `dream.resume` also takes backend `overrides` |
-| `session.register` | `tool`, `run_ref`, `sessions` (`[{"source", "session_id"}]` or `[{"file"}]`, each with optional `workflow`, `project`, `user_quote_entries`) |
+| `session.register` | `tool`, `run_ref`, `sessions` (`[{"source", "session_id"}]` or `[{"file"}]` naming a session file, each with optional `correlation_id`, `workflow`, `project`, `user_quote_entries`) |
 | `session.forget`, `session.restore` | `session_id`, optional `source` |
 
 `dream.start`, `dream.resume` and `dream.discard` take the dream lock. The
 other operations take none and may run while a dream runs. Recall and search
 return only retained knowledge that applies to the scope, ordered by scope
 specificity, confidence and latest support, within the token limit. Feedback
-with a `feedback_id` already recorded changes nothing.
+with a `feedback_id` already recorded changes nothing. Registering returns each
+session's `state`: `registered`, `updated`, `unchanged` or `forgotten`.
 
 ## Develop
 
@@ -135,10 +157,12 @@ with a `feedback_id` already recorded changes nothing.
 make lint        # ruff check and format check
 make test        # the test suite, with fake claude, codex and apsis executables
 make check       # both
+make build       # the wheel and source distribution, into dist/
 make test-live   # opt-in checks against the installed tools
 ```
 
-`make test` needs no login, model or network. `make test-live` makes small model
+uv runs every target on the Python in `.python-version` (3.15.2). `make test`
+needs no login, model or network. `make test-live` makes small model
 calls with the user's real logins and a temporary `DREAMING_HOME`. Each test
 skips itself when its tool is missing: `apsis` for every live test, `claude` or
 `codex` for that harness, and an LM Studio server at `http://localhost:1234`

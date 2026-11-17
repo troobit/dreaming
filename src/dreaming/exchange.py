@@ -18,8 +18,6 @@ An export waits until no dream is unfinished, because an unfinished dream's
 revisions are not yet retained.
 """
 
-from __future__ import annotations
-
 import json
 import sqlite3
 

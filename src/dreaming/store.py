@@ -11,8 +11,6 @@ Evidence is stored redacted; every source reference carries an availability
 marker (`available|unavailable|changed`, 13.7).
 """
 
-from __future__ import annotations
-
 import re
 import sqlite3
 import tempfile

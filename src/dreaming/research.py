@@ -11,8 +11,6 @@ well as the kind the model gave, so fetched text labelled as local still counts
 as fetched (9.19).
 """
 
-from __future__ import annotations
-
 import json
 import sqlite3
 from collections.abc import Mapping

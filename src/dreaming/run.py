@@ -13,8 +13,6 @@ steps. Limits and stop requests are checked between steps and before each call,
 never during one.
 """
 
-from __future__ import annotations
-
 import argparse
 import contextlib
 import fcntl

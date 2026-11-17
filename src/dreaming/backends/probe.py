@@ -10,8 +10,6 @@ backend, keyed by the harness version and the backend's configuration; a dry run
 reads only that cache and `--version` (1.7).
 """
 
-from __future__ import annotations
-
 import json
 import os
 import uuid
@@ -131,7 +129,7 @@ def _load(home: Path, name: str, backend: dict, version: str) -> ProbeResult | N
     path = _cache_path(home, name)
     try:
         entry = json.loads(path.read_text())
-    except (OSError, json.JSONDecodeError):
+    except OSError, json.JSONDecodeError:
         return None
     if entry.get("version") != version or entry.get("config") != backend:
         return None

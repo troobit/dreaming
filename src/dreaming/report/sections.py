@@ -8,8 +8,6 @@ and links are rendered only for http and https (16.2).
 when none was recorded.
 """
 
-from __future__ import annotations
-
 import json
 import sqlite3
 from collections import Counter

@@ -24,8 +24,6 @@ being merged, is proposed again only with a source on a domain it did not cite
 (16.6).
 """
 
-from __future__ import annotations
-
 import ipaddress
 import json
 import sqlite3

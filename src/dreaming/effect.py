@@ -18,8 +18,6 @@ pre-change rate is a candidate again (11.2); the reviewer sees the change and
 its effect as context.
 """
 
-from __future__ import annotations
-
 import sqlite3
 from collections import Counter
 from collections.abc import Mapping

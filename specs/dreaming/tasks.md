@@ -16,7 +16,7 @@ references:
     - Stream: 1
     - Requirements: [6.4](requirements.md#6.4), [14.4](requirements.md#14.4)
   - [x] 1.2. Create the project skeleton and implement the home checks <!-- id:w1na5d1 -->
-    - repository root is this checkout on branch `dreaming`; pyproject.toml (Python 3.12+, uv, ruff, pytest, hypothesis), Makefile with `test`, `lint`, `install`, src/dreaming/{cli,config}.py, instructions/ and tests/ directories; no import from agentic-coding
+    - repository root is this checkout on branch `dreaming`; pyproject.toml (Python 3.15+, uv, ruff, pytest, hypothesis), Makefile with `test`, `lint`, `install`, src/dreaming/{cli,config}.py, instructions/ and tests/ directories; no import from agentic-coding
     - Blocked-by: w1na5d0 (Write tests for the private home and CLI entry)
     - Stream: 1
     - Requirements: [6.4](requirements.md#6.4), [14.4](requirements.md#14.4)

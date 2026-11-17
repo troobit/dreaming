@@ -27,8 +27,6 @@ cover the replay, or when its replays do not all run on one backend (9.17).
 Replay calls count against the budget like any other call (9.18).
 """
 
-from __future__ import annotations
-
 import json
 import shutil
 import sqlite3

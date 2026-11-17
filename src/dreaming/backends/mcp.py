@@ -17,8 +17,6 @@ server a role names, the role's calls go on without that server's tools, and
 the report lists them (`unavailable_tools`).
 """
 
-from __future__ import annotations
-
 import copy
 import json
 from pathlib import Path

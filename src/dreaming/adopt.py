@@ -14,8 +14,6 @@ fails the scan or its generate commands is saved as a patch under
 `~/.dreaming/patches/<run>/` and withheld instead.
 """
 
-from __future__ import annotations
-
 import json
 import os
 import re

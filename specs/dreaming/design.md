@@ -24,7 +24,7 @@ dream start ─▶ lock ─▶ snapshot config + instructions ─▶ select sess
 
 ### Placement
 
-The program, its tests, the instruction set, the `dream` skill and this spec (`specs/dreaming/`) live in one repository, developed on a branch named `dreaming`. It is an installable package (Python 3.12+, uv, ruff, pytest, as in screw) with its own Makefile (`make test`, `make lint`, `make install`). The user's data lives under `~/.dreaming/` (override `DREAMING_HOME`), mode 0700, checked at start to be outside every git repository (6.4).
+The program, its tests, the instruction set, the `dream` skill and this spec (`specs/dreaming/`) live in one repository, developed on a branch named `dreaming`. It is an installable package (Python 3.15+, uv, ruff, pytest, as in screw) with its own Makefile (`make test`, `make lint`, `make install`). The user's data lives under `~/.dreaming/` (override `DREAMING_HOME`), mode 0700, checked at start to be outside every git repository (6.4).
 
 ```
 (repository root)
@@ -111,7 +111,7 @@ class CallResult:
 - Claude: isolation flags in order of preference `--safe-mode` (keeps login; disables CLAUDE.md, skills, plugins, hooks, MCP and agents), otherwise `--setting-sources "" --strict-mcp-config --disable-slash-commands` with `CLAUDE_CODE_DISABLE_CLAUDE_MDS=1` and `CLAUDE_CODE_DISABLE_AUTO_MEMORY=1`; an explicit tools list without `Agent`; a permission mode that never prompts. The call's working directory is under `DREAMING_HOME`, so no parent-directory instruction file loads (probed).
 - Codex: `codex exec --json` with the skills block and user instructions suppressed (`-c skills.include_instructions=false`; an empty `CODEX_HOME` only if the probe shows auth and apsis visibility both survive). Its JSON event stream is saved under `runs/<id>/codex/` and registered with apsis through `--codex-exec-dir` alongside the user's existing directories. If the probe shows an agent-launch tool (`spawn_agent`) cannot be removed, the adapter kills the call on any agent-launch event and records it as a failed call.
 - Transcripts are never hidden from apsis (5.8). Direct LM Studio calls put `client_metadata.thread_id` first in the request body so the server log keeps it when it truncates long bodies.
-- A dry run probes with `--version`, config checks and the cached result of the last real probe (keyed by backend version) and labels each as `cached` or `unprobed`; the call-based probe runs only at a real start and counts against the budget (1.7, 5.5).
+- A dry run probes with `--version`, config checks and the cached result of the last real probe (keyed by backend version) and labels each as `cached` or `unprobed`; the call-based probe runs only at a real start and counts against the budget (1.7, 5.5). It reads a private copy of the store and its WAL, so it writes none of the store's files (Q142).
 - The author receives the target repository's `CLAUDE.md`/`AGENTS.md` as counted input; harnesses never load it themselves (4.4).
 - A harness using LM Studio gets its role's allowed devtools tools from the same filtered config (5.7).
 - Usage missing from a harness is estimated as `ceil(utf8 bytes / 4)` over prompt and output, and `usage_estimated` is set; budgets count the estimate (1.2).
@@ -132,7 +132,7 @@ Contract: a step's follow-up steps are inserted in the same SQLite transaction t
 Start sequence:
 1. The `dream start` parent opens the lock file and calls `flock(LOCK_EX | LOCK_NB)`. If another process holds it, the parent exits 4 naming the running dream from the `runs` row and changes nothing.
 2. The parent inserts the run row (`running`) and spawns the detached child in a new session with the lock descriptor inherited (`pass_fds`). The child's descriptor refers to the same open file description, so the lock is held continuously from step 1; no other start can take it between parent and child.
-3. The parent records the child's process group, then lets it begin by writing to a pipe the child waits on; a child whose parent dies first reads end of file and exits having done nothing (Q143). The parent closes its descriptor and returns the run id. The lock stays held by the child until it exits or dies.
+3. The parent records the child's process group, then lets it begin by writing to a pipe the child waits on; a child whose parent dies first reads end of file and exits 1 having done nothing (Q143). The parent closes its descriptor and returns the run id. The lock stays held by the child until it exits or dies.
 
 Every other process spawned by the child (model calls, checks, deploy commands) is started with `close_fds=True` so it does not inherit the descriptor. A surviving grandchild would otherwise keep the lock after the child died and block resume.
 
@@ -249,6 +249,7 @@ Effect measurement (11.1): for each applied change, count observations of its pa
 | Resume after a merge into a user checkout | No further merges or deploys; report state and commands (9.15) |
 | Process gone while holding the lock | The kernel releases the flock; run resumes if interrupted (1.6) |
 | Migration while a run is unfinished | Refused with `migration_blocked` naming the run; resume or discard it first |
+| Store still changing after five reads by a dry run's or reader trial's copy | Refused with `store_busy` (exit 1); try again (Q142) |
 
 Exit codes follow screw except for budget exhaustion: 0 success (including `budget_exhausted`), 1 failure, 2 usage or config, 4 skipped (already running), 5 partial. A run stopped by an error stays `interrupted` with the error on its row, so it can be resumed or discarded (Q85). When a run reaches its own limit after `partial` work, the status is `partial` and the exit is 5.
 

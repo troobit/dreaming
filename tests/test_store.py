@@ -286,6 +286,16 @@ def test_a_memory_copy_of_no_store_is_empty_and_creates_nothing(tmp_path):
     assert list(empty.iterdir()) == []
 
 
+def test_a_memory_copy_of_a_store_that_keeps_changing_is_busy(tmp_path, monkeypatch):
+    path = tmp_path / "dreaming.db"
+    store.open_store(path).close()
+    stamps = iter(range(1, 100))
+    monkeypatch.setattr(store, "_stamp", lambda p: (next(stamps),))
+    with pytest.raises(DreamingError) as excinfo:
+        store.memory_copy(path)
+    assert excinfo.value.code == "store_busy"
+
+
 def test_transaction_rolls_back_on_error(db):
     with pytest.raises(RuntimeError), store.transaction(db):
         _insert_run(db)

@@ -10,8 +10,6 @@ keeps the newest unread ones within the session budget, and splits each into
 reader-sized parts.
 """
 
-from __future__ import annotations
-
 import json
 import os
 import sqlite3
@@ -729,7 +727,7 @@ def _input_sessions(input_ref: str | None) -> set[tuple[str, str]]:
     (`observe.call_input_ref`)."""
     try:
         found = json.loads(input_ref or "")["sessions"]
-    except (ValueError, TypeError, KeyError):
+    except ValueError, TypeError, KeyError:
         return set()
     return {tuple(pair) for pair in found if isinstance(pair, list) and len(pair) == 2}
 

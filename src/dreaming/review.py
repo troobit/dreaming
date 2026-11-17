@@ -10,8 +10,6 @@ program applies only when they pass the rules, recording the reason for every
 one it refuses. Only the program creates pattern ids.
 """
 
-from __future__ import annotations
-
 import json
 import sqlite3
 from collections import Counter

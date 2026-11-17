@@ -10,8 +10,6 @@ output instead of asking again.
 Functions here run in the caller's transaction, or commit at once in autocommit.
 """
 
-from __future__ import annotations
-
 import json
 import sqlite3
 from collections.abc import Iterable

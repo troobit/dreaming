@@ -11,8 +11,6 @@ Inputs are sized for the smallest context in the role's fallback list (5.2),
 less a share kept for the reply.
 """
 
-from __future__ import annotations
-
 import json
 from collections.abc import Mapping, Sequence
 from dataclasses import asdict, dataclass

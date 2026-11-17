@@ -7,8 +7,6 @@ beside them). To re-record the contract fixtures after an apsis upgrade:
     uv run python tests/apsis_contract.py
 """
 
-from __future__ import annotations
-
 import json
 import os
 import shutil

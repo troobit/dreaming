@@ -5,8 +5,6 @@ the role schemas use. `unsupported` lists any other keyword in a schema, and
 loading a schema refuses one, so no constraint is silently ignored.
 """
 
-from __future__ import annotations
-
 from typing import Any
 
 SUPPORTED = frozenset(

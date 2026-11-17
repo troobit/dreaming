@@ -14,8 +14,6 @@ actor and base version, a cap on how much one run may rewrite, and conflicts
 kept as `contested` instead of resolved by the model.
 """
 
-from __future__ import annotations
-
 import hashlib
 import json
 import sqlite3

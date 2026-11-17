@@ -11,8 +11,6 @@ patterns are added, and `redact` repeats until nothing changes, so redacting a
 redacted text changes nothing.
 """
 
-from __future__ import annotations
-
 import re
 
 PATTERNS: list[re.Pattern] = [

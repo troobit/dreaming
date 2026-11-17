@@ -9,8 +9,6 @@ The page's sections are in `sections.py`; its stylesheet and shell are vendored
 from agentic-coding in `shell.py` (10.5).
 """
 
-from __future__ import annotations
-
 import sqlite3
 import webbrowser
 from datetime import UTC, datetime

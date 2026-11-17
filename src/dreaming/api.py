@@ -17,8 +17,6 @@ until the next would exceed the limit in estimated tokens, `utf8_bytes/4` of
 the item's compact JSON.
 """
 
-from __future__ import annotations
-
 import json
 import sqlite3
 from collections.abc import Callable, Mapping

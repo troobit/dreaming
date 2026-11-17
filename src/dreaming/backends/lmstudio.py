@@ -7,8 +7,6 @@ what context, is read from LM Studio's REST API before every call, because the
 user can reload a model between calls; dreaming never loads one itself.
 """
 
-from __future__ import annotations
-
 import json
 import urllib.error
 import urllib.request
@@ -152,7 +150,7 @@ class LMStudioBackend:
             raise BackendError(f"{self.name}: {exc}") from exc
         try:
             content = reply["choices"][0]["message"]["content"]
-        except (KeyError, IndexError, TypeError):
+        except KeyError, IndexError, TypeError:
             raise BackendError(
                 f"{self.name}: a reply without a message: {json.dumps(reply)[:500]}"
             ) from None

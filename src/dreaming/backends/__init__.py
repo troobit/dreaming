@@ -1,8 +1,6 @@
 """Model backends: harness adapters, the direct LM Studio adapter, probes and the
 dispatcher that applies one retry and fallback policy to every call."""
 
-from __future__ import annotations
-
 import json
 import os
 import re
@@ -172,7 +170,7 @@ def run_process(
         try:
             proc.stdin.write(stdin_text)
             proc.stdin.close()
-        except (BrokenPipeError, ValueError):
+        except BrokenPipeError, ValueError:
             pass
 
     stderr: list[str] = []
@@ -257,7 +255,7 @@ def usage_limit_reset(text: str, now: datetime) -> datetime | None:
                 reset = reset.replace(year=year + 1)
         elif reset < local:
             reset += timedelta(days=1)
-    except (ValueError, ZoneInfoNotFoundError):
+    except ValueError, ZoneInfoNotFoundError:
         return None
     return reset
 

@@ -5,8 +5,6 @@ Exit codes follow screw except for budget exhaustion (design, Error Handling):
 4 skipped (already running), 5 partial.
 """
 
-from __future__ import annotations
-
 SUCCESS = 0
 FAILURE = 1
 USAGE_ERROR = 2

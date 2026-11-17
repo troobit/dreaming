@@ -8,8 +8,6 @@ as confirmed only when the entry it cites is the user's or a check's, never the
 assistant's own claim. Whatever fails is recorded with the reason (7.5).
 """
 
-from __future__ import annotations
-
 import hashlib
 import json
 import re

@@ -4,8 +4,6 @@ Configuration is `~/.dreaming/config.toml` merged over `DEFAULTS`. The result is
 a plain JSON-serialisable dict, so the snapshot of a run is the dict itself.
 """
 
-from __future__ import annotations
-
 import copy
 import json
 import os

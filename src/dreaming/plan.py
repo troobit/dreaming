@@ -5,8 +5,6 @@
 editing it changes nothing and the next render replaces it.
 """
 
-from __future__ import annotations
-
 import sqlite3
 from pathlib import Path
 

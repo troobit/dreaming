@@ -208,8 +208,20 @@ def test_a_live_process_reusing_the_recorded_group_id_is_left_alone(
 
 
 def test_the_child_starts_work_only_once_its_process_group_is_recorded(
-    home, cfg, children, tmp_path
+    home, cfg, children, tmp_path, monkeypatch
 ):
+    # The group recorded when the ready byte is written: checking it there,
+    # not from the child, fails if the byte ever comes before the UPDATE.
+    groups = []
+    write = os.write
+
+    def write_after_check(fd, data):
+        conn = store.open_store(home / "dreaming.db")
+        groups.append(conn.execute("SELECT process_group FROM runs").fetchone()[0])
+        conn.close()
+        return write(fd, data)
+
+    monkeypatch.setattr(os, "write", write_after_check)
     seen = tmp_path / "seen"
     child = children(f"""
         import os, pathlib, sqlite3, sys
@@ -224,6 +236,7 @@ def test_the_child_starts_work_only_once_its_process_group_is_recorded(
     """)
     started = run.start(home, cfg, child=child)
     assert started.process.wait(timeout=10) == 0
+    assert groups == [started.process.pid]
     pid, group = seen.read_text().split()
     assert int(pid) == int(group) == started.process.pid
 

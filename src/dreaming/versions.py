@@ -13,8 +13,6 @@ not current and no unfinished run records it.
     python -m dreaming.versions launch ARGS...   (what the launcher runs)
 """
 
-from __future__ import annotations
-
 import argparse
 import io
 import os

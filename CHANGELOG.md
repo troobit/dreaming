@@ -8,7 +8,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
-- README with requirements, install, configuration, commands, `dream api` requests and responses, and how to run the tests.
+- README with requirements, install, configuration (including which example settings are the author's own and that it enables `auto_apply`), commands, `dream api` requests, responses and error codes, and how to run the tests.
+- `make build` builds the wheel and source distribution into `dist/`.
 - Python and SQLite gotchas in `docs/agent-notes/python.md`.
 - `dream` agent skill (task 30): `skills/dream/SKILL.md` dry-runs, starts (optionally scoped with `--repo` or `--workflow`), inspects, resumes and opens the report of a dream through the installed `dream` command and `dream api` only, so it works from any directory and installs in another harness by copying the folder. `dream report --open` opens the report in the default browser on request.
 - Portable end-to-end test (task 31): a dream runs through the real `dream` command and detached process with a session source, backend, instruction set and store outside any agentic-coding checkout, no skills and no target repository. It retains knowledge, researches, authors a learning recommendation, writes its report and exports; the export imports into a second fresh store and exports again unchanged, keeping identifiers, scopes, availability markers, dismissals and forgotten sessions. The fake `claude` gains a `responder` scenario key and the fake `apsis` a `sessions_dir`.
@@ -21,8 +22,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- Python 3.15 or newer is required. Development, builds and tests use 3.15.2 from `.python-version`, and modules no longer use `from __future__ import annotations` (Q144).
 - Store migrations refuse any statement other than creating a table or index or adding a column, and leave the store unchanged (Q141).
-- A dry run and `dream trial reader` read a private copy of the store and its WAL, so they no longer write the store's `-shm` or checkpoint a killed dream's WAL into it (Q142).
+- A dry run and `dream trial reader` read a private copy of the store and its WAL, so they no longer write the store's `-shm` or checkpoint a killed dream's WAL into it; a store that keeps changing while it is copied fails with `store_busy` (Q142).
 - The detached dream process waits until `dream run` has recorded its process group before doing any work, and exits having done nothing if the starting process died first (Q143).
 - The detached dream process now runs the real phases by run kind: Read, Review, Research, Author and Adopt (with the replay gate) for a dream, Research and Author for a currency review, all loaded from the run's instruction snapshot, and writes the report on exit. A process that cannot load its instructions leaves the run interrupted with the reason.
 - The shared MCP definitions are optional: a role tool whose server is not defined, or with no definitions file, is left out of the call and listed in the report instead of failing the call and stopping the dream.
@@ -68,7 +70,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `sessions.record_session` and `sessions.record_skipped`, which record what was read on every source copy without clearing the forgotten flag.
 - Forgetting and restoring a session (`knowledge.forget_session`, `knowledge.restore_session`) across every source copy. Counts, pattern ranking and observations given to roles leave out forgotten and excluded evidence, and knowledge items or changes whose counted support fails 4.5 or 13.3 are withheld at once.
 - `backends.estimate_tokens` (`ceil(utf8 bytes / 4)`), shared by probes and session splitting; store migration v2 adds listing sizes to `sessions_seen`.
-- Dreaming foundation (tasks 1–5): the `dream` package (Python 3.12+, uv, no runtime dependencies) with `make test`, `make lint`, `make test-live` and `make install`; the private home (`DREAMING_HOME`, mode 0700, refused inside any git repository); the SQLite store with additive `user_version` migrations, WAL and `migration_blocked`; configuration defaults, validation (exit 2), per-run overrides, lens loading and the start-of-run snapshot read from the instruction repository's default branch; `dream config`; backend probes for Claude Code, Codex and direct LM Studio with a cached dry-run view (`dream probe`, `dream probe --cached`); the apsis shared-json client with recorded contract fixtures.
+- Dreaming foundation (tasks 1–5): the `dream` package (Python 3.15+, uv, no runtime dependencies) with `make test`, `make lint`, `make test-live` and `make install`; the private home (`DREAMING_HOME`, mode 0700, refused inside any git repository); the SQLite store with additive `user_version` migrations, WAL and `migration_blocked`; configuration defaults, validation (exit 2), per-run overrides, lens loading and the start-of-run snapshot read from the instruction repository's default branch; `dream config`; backend probes for Claude Code, Codex and direct LM Studio with a cached dry-run view (`dream probe`, `dream probe --cached`); the apsis shared-json client with recorded contract fixtures.
 - Dreaming decisions Q77–Q81: argparse CLI, auto-apply off by default, Codex rollouts correlate by session id, Claude models unknown through apsis 4bf9776, Codex skipped for isolated roles while bundled skills stay listed.
 - Specs for `dreaming` (requirements, design, decision log, tasks, prerequisites) and `dry`, plus `specs/BACKLOG.md`.
 - Dreaming Decision 16: a provider usage limit with a reset time within `max_usage_wait` makes the run wait and repeat the call; `fallback_on_usage_limit` (default off) moves to the next backend instead, and the waiting notice shows each backend's context size and, where reported, model release date.

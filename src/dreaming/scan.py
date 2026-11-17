@@ -14,8 +14,6 @@ credential nor a listed name reaches the report (design, Instruction set and
 snapshot).
 """
 
-from __future__ import annotations
-
 import json
 import re
 import sqlite3

@@ -18,8 +18,6 @@ review page's look is copied by hand if wanted.
   the markup of `sections.py` (`render_metrics`, the cards, `build_toc`).
 """
 
-from __future__ import annotations
-
 import html
 from collections.abc import Iterable
 from string import Template

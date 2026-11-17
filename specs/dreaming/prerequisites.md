@@ -4,7 +4,7 @@ These tasks must be completed by the user before or during implementation. The t
 
 ## Before Starting
 - [ ] Create the repository, check out the branch `dreaming`, copy `specs/dreaming/` into it, and decide whether it is public or private; scan rules for public repositories apply to it as a target repository (9.12).
-- [ ] Confirm `uv`, Python 3.12+, `rune`, `apsis` and `git` are on `PATH` for the shell that runs the agent.
+- [ ] Confirm `uv`, Python 3.15+, `rune`, `apsis` and `git` are on `PATH` for the shell that runs the agent.
 
 ## During Implementation
 - [ ] Before task 4.3 (live probes) and task 17 (reader trial): Claude Code and Codex are logged in, LM Studio's server is running with a model loaded, and a few recorded sessions exist for apsis to read.

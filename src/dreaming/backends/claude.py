@@ -1,7 +1,5 @@
 """Claude Code as a role harness: command line, isolation and stream parsing."""
 
-from __future__ import annotations
-
 import json
 import os
 import uuid

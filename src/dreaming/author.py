@@ -26,8 +26,6 @@ change is then `proposed`, or `withheld` with its patch when the public scan or
 a generate command stops it (9.5, 9.12).
 """
 
-from __future__ import annotations
-
 import json
 import sqlite3
 import subprocess

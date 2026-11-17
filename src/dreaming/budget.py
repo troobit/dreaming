@@ -6,8 +6,6 @@ row keeps the seconds spent, and the clock pauses while the run waits for a
 provider usage limit to reset.
 """
 
-from __future__ import annotations
-
 import sqlite3
 import time
 from collections.abc import Callable

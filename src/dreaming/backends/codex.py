@@ -1,7 +1,5 @@
 """Codex as a role harness: command lines, prompt inspection and event parsing."""
 
-from __future__ import annotations
-
 import hashlib
 import json
 import os

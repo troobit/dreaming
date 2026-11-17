@@ -25,8 +25,6 @@ Estimates are `utf8 bytes / 4`, as for every other estimate here. Files that
 cannot be read are listed as problems and never stop a dream.
 """
 
-from __future__ import annotations
-
 import glob
 import json
 import sqlite3

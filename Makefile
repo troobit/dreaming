@@ -1,4 +1,4 @@
-.PHONY: lint test test-live check install
+.PHONY: lint test test-live check build install
 
 lint:
 	uv run ruff check .
@@ -13,6 +13,11 @@ test-live:
 	uv run pytest -m live
 
 check: lint test
+
+# Builds the wheel and source distribution into dist/ with the Python in
+# .python-version.
+build:
+	uv build
 
 # Installs the committed HEAD into ~/.dreaming/versions/<revision>/ and links
 # ~/.local/bin/dream to the launcher (7.3).
