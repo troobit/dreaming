@@ -65,6 +65,17 @@ def seed(db, *sids):
     return [f"e-{sid}" for sid in sids]
 
 
+def file_finding(db, evidence_id):
+    """A finding from inspecting current files, support on its own (4.5)."""
+    db.execute(
+        "INSERT INTO file_findings (evidence_id, repo, revision, path, location,"
+        " finding, lens, lens_version) VALUES (?, 'agentic', 'abc', ?, 'L1',"
+        " 'a broken link', 'broken-references', 1)",
+        (evidence_id, RULE),
+    )
+    return evidence_id
+
+
 @pytest.fixture
 def repo(tmp_path):
     return make_repo(tmp_path, "agentic", {"check.sh": "exit 0\n", RULE: "# Testing\n"})
@@ -242,7 +253,12 @@ def test_a_change_that_does_nothing_is_held_with_its_whole_branch(db, home, repo
     evidence = seed(db, "s1", "s2", "s3")
     propose(db, home, cfg, {RULE: NOTHING}, evidence=evidence)
     other = propose(
-        db, home, cfg, {"README.md": "# agentic\n\nmore\n"}, evidence=["ff-1"], cid="c2"
+        db,
+        home,
+        cfg,
+        {"README.md": "# agentic\n\nmore\n"},
+        evidence=[file_finding(db, "ff-1")],
+        cid="c2",
     )
     before = head(repo)
 
@@ -608,7 +624,7 @@ def test_a_change_citing_only_file_findings_is_not_replayed(db, home, repo):
     cfg = configure({"agentic": repo})
     add_run(db, RUN, cfg, started_at=NOW)
     seed(db, "s1", "s2")
-    propose(db, home, cfg, {RULE: FIX}, evidence=["ff-broken-link"])
+    propose(db, home, cfg, {RULE: FIX}, evidence=[file_finding(db, "ff-broken-link")])
     found = model()
     adopt_run(db, home, cfg, found, StubApsis(session("s1"), session("s2")))
     assert state(db) == ("applied", None)

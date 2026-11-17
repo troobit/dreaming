@@ -7,8 +7,9 @@ import pytest
 from dreamkit import ScriptedModel, build_config
 from gitkit import branches, commit, head, make_repo, out, status
 from runkit import Crash, FakeClock, LocalPhase, add_run, git, make_runner, step_states
+from sessiondocs import add_observation, add_seen
 
-from dreaming import adopt
+from dreaming import adopt, knowledge
 from dreaming.steps import NewStep
 
 RUN = "dream-now"
@@ -63,6 +64,13 @@ def change(db, home, cfg, repo, cid, files, *, depends_on=(), external=0):
     message = f"Change {cid}\n\nDreaming-Evidence: e-{cid}"
     committed = adopt.commit_change(
         home, cfg, RUN, work, change_id, message, set(files), []
+    )
+    # A file finding supports a change on its own (4.5).
+    db.execute(
+        "INSERT OR IGNORE INTO file_findings (evidence_id, repo, revision, path,"
+        " location, finding, lens, lens_version) VALUES (?, ?, 'abc', 'rules/x.md',"
+        " 'L1', 'a broken link', 'broken-references', 1)",
+        (f"e-{cid}", repo),
     )
     db.execute(
         "INSERT INTO changes (id, run, repo, branch, commit_sha, depends_on,"
@@ -265,6 +273,35 @@ def test_one_held_change_keeps_the_whole_branch_unmerged(db, home, repos, logs):
             reason,
         )
     assert head(repos["agentic"]) == before
+
+
+@pytest.mark.parametrize("forget", [False, True])
+def test_a_change_that_lost_its_support_keeps_the_branch_unmerged(
+    db, home, repos, logs, forget
+):
+    cfg = configure(repos)
+    add_run(db, RUN, cfg, started_at=NOW)
+    ch = change(db, home, cfg, "agentic", "c1", {"rules/uv.md": "# uv\n"})
+    evidence = []
+    for sid in ("s1", "s2", "s3"):  # min_sessions distinct sessions (4.5)
+        add_seen(db, "claude", sid)
+        add_observation(db, f"o-{sid}", "claude", sid, kind="assistant_suggestion")
+        evidence.append(f"o-{sid}")
+    db.execute(
+        "UPDATE changes SET evidence = ? WHERE id = ?", (json.dumps(evidence), ch)
+    )
+    if forget:
+        # Forgotten after the change was authored, before its adoption (2.11).
+        knowledge.forget_session(db, "s1")
+    before = head(repos["agentic"])
+    adopt_run(db, home, cfg)
+    if not forget:
+        assert row(db, ch)["status"] == "applied"
+        return
+    assert row(db, ch)["status"] == "waiting"
+    assert "lost the support it was authored on" in row(db, ch)["reason"]
+    assert head(repos["agentic"]) == before
+    assert lines(logs["deploy"]) == []
 
 
 # Deploy failure and rollback (9.9, 9.10)
@@ -516,3 +553,81 @@ def test_reverts_on_the_default_branch_are_detected(
     reverted = row(db, ch)
     assert reverted["status"] == expected
     assert reverted["reverted_at"] == out(repos["agentic"], "log", "-1", "--format=%cI")
+
+
+# Merges and deletions by hand (9.13, 9.14, 10.4)
+
+LATER = "dream-later"
+
+
+def hand_merge(repo, ff):
+    if ff:
+        git(repo, "merge", "-q", "--ff-only", BRANCH)
+        landing = out(repo, "rev-parse", "HEAD")
+        commit(repo, {"README.md": "later work\n"}, "the user's later work")
+    else:
+        commit(repo, {"README.md": "the user's work\n"}, "the user's work")
+        git(repo, "merge", "-q", "--no-ff", "-m", "merge by hand", BRANCH)
+        landing = out(repo, "rev-parse", "HEAD")
+    return landing
+
+
+@pytest.mark.parametrize("ff", [False, True])
+def test_a_branch_merged_by_hand_is_applied_and_its_revert_seen(
+    db, home, repos, logs, ff
+):
+    repo = repos["agentic"]
+    cfg = configure(repos, auto_apply=False)
+    add_run(db, RUN, cfg, started_at=NOW)
+    ch = change(db, home, cfg, "agentic", "c1", {"rules/uv.md": "# uv\n"})
+    adopt_run(db, home, cfg)
+    assert row(db, ch)["status"] == "waiting"
+    adopt.detect_merges(db, cfg, LATER, NOW)
+    assert row(db, ch)["status"] == "waiting"
+
+    landing = hand_merge(repo, ff)
+    adopt.detect_merges(db, cfg, LATER, NOW)
+    merged = row(db, ch)
+    assert merged["status"] == "applied"
+    assert adopt.landed(repo, merged["commit_sha"], "main")[0] == landing
+    assert merged["applied_at"] == out(repo, "log", "-1", "--format=%cI", landing)
+    # The run that made the change leaves it to its own Adopt step (9.15).
+    db.execute("UPDATE changes SET status = 'waiting' WHERE id = ?", (ch,))
+    adopt.detect_merges(db, cfg, RUN, NOW)
+    assert row(db, ch)["status"] == "waiting"
+    adopt.detect_merges(db, cfg, LATER, NOW)
+
+    if ff:
+        git(repo, "revert", "--no-edit", merged["commit_sha"])
+    else:
+        git(repo, "revert", "--no-edit", "-m", "1", landing)
+    adopt.detect_reverts(db, cfg)
+    assert row(db, ch)["status"] == "rejected"
+
+
+def test_a_branch_deleted_by_hand_is_a_rejection(db, home, repos, logs):
+    cfg = configure(repos, auto_apply=False)
+    add_run(db, RUN, cfg, started_at=NOW)
+    ch = change(db, home, cfg, "agentic", "c1", {"rules/uv.md": "# uv\n"})
+    adopt_run(db, home, cfg)
+    git(repos["agentic"], "branch", "-D", BRANCH)
+    later = "2026-11-20T09:00:00+00:00"
+    adopt.detect_merges(db, cfg, LATER, later)
+    assert (row(db, ch)["status"], row(db, ch)["reverted_at"]) == ("rejected", later)
+
+
+def test_a_merge_the_program_made_keeps_its_own_record(db, home, repos, logs):
+    """Merged before an interruption and not deployed: 9.15, not a hand merge."""
+    repo = repos["agentic"]
+    cfg = configure(repos, auto_apply=False)
+    add_run(db, RUN, cfg, started_at=NOW)
+    ch = change(db, home, cfg, "agentic", "c1", {"rules/uv.md": "# uv\n"})
+    db.execute("UPDATE changes SET status = 'waiting' WHERE id = ?", (ch,))
+    git(repo, "merge", "-q", "--no-ff", "-m", "dream merge", BRANCH)
+    db.execute(
+        "INSERT INTO adoption (run, repo, branch, step, head_after, at)"
+        " VALUES (?, 'agentic', ?, 'merging', ?, ?)",
+        (RUN, BRANCH, head(repo), NOW),
+    )
+    adopt.detect_merges(db, cfg, LATER, NOW)
+    assert row(db, ch)["status"] == "waiting"

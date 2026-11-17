@@ -28,7 +28,7 @@ from fnmatch import fnmatchcase
 from itertools import groupby
 from pathlib import Path
 
-from dreaming import config, scan
+from dreaming import config, knowledge, scan
 from dreaming.backends import ProcessResult, run_process
 from dreaming.errors import DreamingError, Rejected
 
@@ -345,6 +345,26 @@ def held(conn: sqlite3.Connection, run_id: str, repo: str) -> str | None:
     return None
 
 
+def unsupported(
+    conn: sqlite3.Connection, cfg: dict, run_id: str, repo: str
+) -> str | None:
+    """Why the run's branch in `repo` stays unmerged: a change on it whose
+    support no longer meets 4.5 or 13.3, because a session it cites was
+    forgotten or its evidence dismissed after it was authored (2.11)."""
+    rows = conn.execute(
+        "SELECT id FROM changes WHERE run = ? AND repo = ? AND status = 'proposed'"
+        " AND currency_finding_id IS NULL ORDER BY id",
+        (run_id, repo),
+    )
+    for row in rows:
+        if knowledge.change_withheld(conn, row["id"], cfg):
+            return (
+                f"change {row['id']} lost the support it was authored on: a "
+                "session it cites was forgotten or its evidence dismissed (2.11)"
+            )
+    return None
+
+
 # Changes replayed before their checks (9.16)
 
 # Skills and rules, replayed on the opening prompts of past sessions.
@@ -592,6 +612,7 @@ class AdoptPhase:
             return "no lint or test commands are configured (9.8)"
         return (
             held(conn, run_id, repo.name)
+            or unsupported(conn, cfg, run_id, repo.name)
             or self._replays(ctx, repo)
             or self._check(ctx, repo)
             or _checkout(repo)
@@ -835,7 +856,71 @@ def _after_interruption(ready: list[str], merged: list[dict]) -> dict[str, Resul
     return results
 
 
-# Reverts the user made (9.13)
+# Merges, deletions and reverts the user made (9.13, 9.14)
+
+
+def landed(repo: Path, commit: str, branch: str) -> tuple[str, str]:
+    """The commit through which `commit` reached `branch`'s first-parent line,
+    and that commit's date: the merge that brought it in, or `commit` itself
+    when the branch was fast-forwarded to it."""
+    later = _git(
+        repo,
+        "log",
+        "--first-parent",
+        "--ancestry-path",
+        "--format=%H %P",
+        f"{commit}..refs/heads/{branch}",
+    ).stdout.split("\n")
+    oldest = [line.split() for line in later if line.strip()]
+    found = commit
+    if oldest and oldest[-1][1] != commit:
+        found = oldest[-1][0]
+    date = _git(repo, "log", "-1", "--format=%cI", found).stdout.strip()
+    return found, date
+
+
+def detect_merges(conn: sqlite3.Connection, cfg: dict, run_id: str, now: str) -> None:
+    """Record earlier dreams' changes the user merged or deleted by hand, from
+    git history, so only changes still on an unmerged branch hold back their
+    pattern (9.14) and appear as unmerged in the report (10.4). A change whose
+    commit is in the default branch is applied, dated by the commit that
+    brought it in, so its effect is measured (11.1). A change whose branch is
+    gone unmerged was rejected by the user (9.13); a currency change's deleted
+    branch is left to the currency review (16.6). Repositories the program
+    merged into keep their own record (9.15)."""
+    rows = conn.execute(
+        "SELECT id, run, repo, branch, commit_sha, currency_finding_id FROM changes"
+        " WHERE run != ? AND status IN ('proposed', 'waiting')"
+        " AND branch IS NOT NULL AND commit_sha IS NOT NULL ORDER BY id",
+        (run_id,),
+    ).fetchall()
+    program: dict[str, set[str]] = {}
+    for row in rows:
+        entry = cfg["repositories"].get(row["repo"])
+        path = repo_path(cfg, row["repo"]) if entry else None
+        if path is None or not path.is_dir():
+            continue
+        if row["run"] not in program:
+            merged = merged_repositories(conn, cfg, row["run"])
+            program[row["run"]] = {m["repo"] for m in merged}
+        if row["repo"] in program[row["run"]]:
+            continue
+        default = entry["default_branch"]
+        if is_ancestor(path, row["commit_sha"], f"refs/heads/{default}"):
+            _, date = landed(path, row["commit_sha"], default)
+            conn.execute(
+                "UPDATE changes SET status = 'applied', applied_at = ?, reason = ?"
+                " WHERE id = ?",
+                (date, f"merged into {default} by hand", row["id"]),
+            )
+        elif row["currency_finding_id"] is None and not branch_exists(
+            path, row["branch"]
+        ):
+            conn.execute(
+                "UPDATE changes SET status = 'rejected', reverted_at = ?, reason = ?"
+                " WHERE id = ?",
+                (now, "its branch was deleted without being merged", row["id"]),
+            )
 
 
 def detect_reverts(conn: sqlite3.Connection, cfg: dict) -> None:
@@ -846,26 +931,30 @@ def detect_reverts(conn: sqlite3.Connection, cfg: dict) -> None:
     reset or a manual undo is not seen."""
     rows = conn.execute(
         "SELECT c.id, c.repo, c.commit_sha, a.head_after AS merge FROM changes c"
-        " JOIN adoption a ON a.run = c.run AND a.repo = c.repo AND a.step = 'merged'"
+        " LEFT JOIN adoption a"
+        " ON a.run = c.run AND a.repo = c.repo AND a.step = 'merged'"
         " WHERE c.status = 'applied' AND c.reverted_at IS NULL ORDER BY c.id"
     ).fetchall()
     for row in rows:
         entry = cfg["repositories"].get(row["repo"])
         path = repo_path(cfg, row["repo"]) if entry else None
-        if path is None or not path.is_dir():
+        if path is None or not path.is_dir() or not row["commit_sha"]:
             continue
+        default = entry["default_branch"]
+        # A merge by hand has no adoption record; git names its merge.
+        merge = row["merge"] or landed(path, row["commit_sha"], default)[0]
         log = _git(
             path,
             "log",
             "--format=%cI%x00%B%x1e",
-            f"{row['merge']}..refs/heads/{entry['default_branch']}",
+            f"{merge}..refs/heads/{default}",
             check=False,
         )
         for record in log.stdout.split("\x1e"):
             date, _, body = record.strip().partition("\0")
             reverts = (
                 f"This reverts commit {row['commit_sha']}",
-                f"This reverts commit {row['merge']}",
+                f"This reverts commit {merge}",
             )
             if not any(r in body for r in reverts):
                 continue

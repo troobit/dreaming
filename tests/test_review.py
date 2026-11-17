@@ -6,9 +6,18 @@ from pathlib import Path
 
 import pytest
 from dreamkit import EMPTY_REVIEW, ScriptedModel, build_config, instructions
+from gitkit import commit, make_repo
 from hypothesis import given, settings
 from hypothesis import strategies as st
-from runkit import Crash, FakeClock, LocalPhase, add_run, make_runner, step_states
+from runkit import (
+    Crash,
+    FakeClock,
+    LocalPhase,
+    add_run,
+    git,
+    make_runner,
+    step_states,
+)
 from sessiondocs import add_observation
 
 from dreaming import review, steps, store
@@ -540,6 +549,32 @@ def test_no_candidate_for_a_pattern_with_an_unmerged_branch(db, cfg):
     assert db.execute("SELECT COUNT(*) FROM candidates").fetchone()[0] == 0
     (rejected,) = rejections(db, "candidate")
     assert "(9.14)" in rejected["reason"]
+
+
+def test_a_branch_the_user_merged_by_hand_no_longer_holds_the_pattern(db, tmp_path):
+    repo = make_repo(tmp_path, "agentic", {"rules/uv.md": "# uv\n"})
+    cfg = build_config(repositories={"agentic": {"path": str(repo)}})
+    git(repo, "branch", "dream/dream-1")
+    git(repo, "switch", "-q", "dream/dream-1")
+    sha = commit(repo, {"rules/uv.md": "# uv\n\nUse uv.\n"}, "Prefer uv")
+    git(repo, "switch", "-q", "main")
+    git(repo, "merge", "-q", "--no-ff", "-m", "merge by hand", "dream/dream-1")
+    earlier_run(db, "dream-1", "2026-11-01T00:00:00+00:00", cfg)
+    pattern(db, "p-uv", "prefers uv")
+    ids = spread(db, "u", "prefers uv", 3, pattern_id="p-uv")
+    change(db, "ch-1", "waiting")
+    db.execute(
+        "UPDATE changes SET branch = 'dream/dream-1', commit_sha = ? WHERE id = 'ch-1'",
+        (sha,),
+    )
+    spread(db, "n", "new", 1)
+    model = reviewer({"candidates": [candidate("p-uv", ids)]})
+    run_review(db, cfg, model)
+    status = db.execute("SELECT status FROM changes WHERE id = 'ch-1'").fetchone()[0]
+    assert status == "applied"
+    (data,) = model.of("reviewer")
+    assert data["patterns"][0]["status"] != "unmerged_change"
+    assert not any("(9.14)" in r["reason"] for r in rejections(db, "candidate"))
 
 
 def test_a_reverted_change_is_proposed_again_once_on_newer_observations(db, cfg):

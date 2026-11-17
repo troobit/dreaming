@@ -282,8 +282,10 @@ class ReviewPhase:
 
     def prepare(self, ctx: Context, step: Step) -> Reviewed:
         conn, cfg, run_id = ctx.conn, ctx.cfg, ctx.run_id
-        # Changes the user has reverted since an earlier dream applied them are
-        # rejected before the reviewer sees each pattern's changes (9.13).
+        # Changes the user has merged, deleted or reverted since an earlier dream
+        # made them are recorded before the reviewer sees each pattern's changes
+        # (9.13, 9.14).
+        adopt.detect_merges(conn, cfg, run_id, ctx.runner.now())
         adopt.detect_reverts(conn, cfg)
         today = ctx.clock.now().date()
         scope = run_request(conn, run_id).scope

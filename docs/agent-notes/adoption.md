@@ -5,10 +5,18 @@ Tasks 23–25 of `specs/dreaming/tasks.md`: `adopt.py` (work copies, commits, `A
 ## Adopt step (`adopt.AdoptPhase`)
 
 - The `adopt` plan step adds one `adopt:<repo>+<repo>` step per linked group (`linked_groups`, union-find over `changes.depends_on`) that has a committed `proposed` change.
-- `_preflight` checks one repository and stops at the first unmet condition, cheapest first: an earlier dream's undeployed merge (`unfinished_adoption`), `auto_apply`, lint/test configured (9.8), `held` (a currency or `external_input` change, 16.3/9.19), `_replays`, `_check`, `_checkout`. The first reason becomes `changes.reason` for every change in the repository, and the whole linked group waits if any member does.
+- `_preflight` checks one repository and stops at the first unmet condition, cheapest first: an earlier dream's undeployed merge (`unfinished_adoption`), `auto_apply`, lint/test configured (9.8), `held` (a currency or `external_input` change, 16.3/9.19), `unsupported` (a change whose support no longer meets 4.5/13.3 after a forget or dismissal, 2.11, Q139), `_replays`, `_check`, `_checkout`. The first reason becomes `changes.reason` for every change in the repository, and the whole linked group waits if any member does.
 - `_check` builds `merge --no-ff` of the dream branch in a detached `<repo>.check` worktree and runs lint and test there. `_merge` is `merge --ff-only <tested sha>` in the user's checkout, so the deployed commit is the tested one.
 - `adoption` rows (`checking … reverted`) are written before the work they name. Whether a merge happened is read from git (`is_ancestor`), not from the rows.
 - One `AdoptPhase` instance serves one process. `merged_here` tells a merge it made from one made before an interruption; after an interruption it makes no further merges (9.15).
+
+## What the user does by hand (9.13, 9.14, Q140)
+
+- `detect_merges(conn, cfg, run_id, now)` runs at the start of each Review step, before `detect_reverts`. It only looks at other runs' `proposed`/`waiting` changes with a branch and commit, and skips repositories in that run's `merged_repositories` (the program's own 9.15 merges).
+- In the default branch → `applied`, `applied_at` from `landed()`: the oldest commit of `git log --first-parent --ancestry-path <sha>..main`, unless its first parent is the change's commit (a fast-forward), in which case the change's own commit. Branch gone and not merged → `rejected` with `reverted_at = now`; currency changes are left to `currency._deleted_branches`.
+- `detect_reverts` LEFT JOINs `adoption`, so hand merges have no `merged` row; it calls `landed()` to name their merge commit.
+- Not handled: a dream interrupted after its merge (9.15) leaves `merged`/`deploying` as the repository's latest adoption, and `unfinished_adoption` then blocks every later dream there. Nothing records that the user ran the finish or undo commands.
+- Test fixtures must cite real evidence: since Q139 a change whose evidence ids name no observation or file finding is `unsupported`. `tests/test_adopt.py::change` adds a file finding; `tests/test_replay.py::file_finding` does the same.
 
 ## Replay gate (`replay.ReplayGate`, 9.16–9.18)
 
