@@ -2,9 +2,10 @@
 
 Migrations are numbered by `PRAGMA user_version` and are additive: a migration
 only creates tables or indexes or adds columns, so an older program version can
-still read a newer store within the same major version. A migration runs only
-when no run is unfinished, because an interrupted run resumes on the program
-version it started with (7.3, Decision 11).
+still read a newer store within the same major version; `migrate` refuses any
+other statement. A migration runs only when no run is unfinished, because an
+interrupted run resumes on the program version it started with (7.3, Decision
+11).
 
 Evidence is stored redacted; every source reference carries an availability
 marker (`available|unavailable|changed`, 13.7).
@@ -12,7 +13,9 @@ marker (`available|unavailable|changed`, 13.7).
 
 from __future__ import annotations
 
+import re
 import sqlite3
+import tempfile
 from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
 from pathlib import Path
@@ -21,6 +24,14 @@ from dreaming.errors import FAILURE, DreamingError
 
 BUSY_TIMEOUT_SECONDS = 30.0
 STORE_NAME = "dreaming.db"
+# Reads of the store and its WAL in `memory_copy` before giving up on a store
+# that keeps changing under them.
+COPY_ATTEMPTS = 5
+
+_ADDITIVE = re.compile(
+    r"(?is)(CREATE\s+(UNIQUE\s+)?(TABLE|INDEX)\s"
+    r"|ALTER\s+TABLE\s+\w+\s+ADD\s+(COLUMN\s+)?\w+\s)"
+)
 
 RUN_STATUSES = (
     "running",
@@ -485,6 +496,12 @@ def statements(script: str) -> list[str]:
     return result
 
 
+def additive(statement: str) -> bool:
+    """Whether a migration statement only creates a table or index or adds a
+    column, which an older program reading the store can ignore."""
+    return _ADDITIVE.match(statement) is not None
+
+
 def store_path(home: Path) -> Path:
     return home / STORE_NAME
 
@@ -544,21 +561,65 @@ def migrate(conn: sqlite3.Connection, migrations: Sequence[str] = MIGRATIONS) ->
                 )
         for number in range(current, target):
             for statement in statements(migrations[number]):
+                if not additive(statement):
+                    raise DreamingError(
+                        f"store migration {number + 1} is not additive: "
+                        f"{statement.splitlines()[0]}",
+                        FAILURE,
+                        "incompatible_version",
+                    )
                 conn.execute(statement)
         conn.execute(f"PRAGMA user_version = {target}")
 
 
+def _stamp(path: Path) -> tuple[int, int, int] | None:
+    try:
+        stat = path.stat()
+    except FileNotFoundError:
+        return None
+    return stat.st_ino, stat.st_size, stat.st_mtime_ns
+
+
+def _stable_files(path: Path) -> dict[str, bytes]:
+    """The store and its WAL by suffix, read until neither changed meanwhile."""
+    paths = {"": path, "-wal": Path(f"{path}-wal")}
+    for _ in range(COPY_ATTEMPTS):
+        before = {suffix: _stamp(p) for suffix, p in paths.items()}
+        try:
+            contents = {s: p.read_bytes() for s, p in paths.items() if before[s]}
+        except FileNotFoundError:
+            continue
+        if before == {suffix: _stamp(p) for suffix, p in paths.items()}:
+            return contents
+    raise DreamingError(
+        f"{path} kept changing while it was copied; try again", FAILURE, "store_busy"
+    )
+
+
 def memory_copy(path: Path) -> sqlite3.Connection:
     """A migrated in-memory copy of the store, or an empty store when there is
-    none, for reading without changing anything on disk (1.7)."""
+    none, for reading without changing anything on disk (1.7).
+
+    SQLite opening the store itself, even read-only, may write its `-shm` file,
+    and the last connection to close checkpoints a WAL left by a dead process
+    into the store and deletes it. So the store and its WAL are copied to a
+    private directory first and read from there."""
     copy = connect(Path(":memory:"))
-    if path.exists():
-        source = sqlite3.connect(path)
-        try:
-            source.backup(copy)
-        finally:
-            source.close()
-    migrate(copy)
+    try:
+        if path.exists():
+            with tempfile.TemporaryDirectory(prefix="dreaming-copy-") as directory:
+                private = Path(directory) / STORE_NAME
+                for suffix, content in _stable_files(path).items():
+                    Path(f"{private}{suffix}").write_bytes(content)
+                source = sqlite3.connect(private)
+                try:
+                    source.backup(copy)
+                finally:
+                    source.close()
+        migrate(copy)
+    except BaseException:
+        copy.close()
+        raise
     return copy
 
 

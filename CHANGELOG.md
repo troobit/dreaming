@@ -8,6 +8,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- README with requirements, install, configuration, commands, `dream api` requests and responses, and how to run the tests.
+- Python and SQLite gotchas in `docs/agent-notes/python.md`.
 - `dream` agent skill (task 30): `skills/dream/SKILL.md` dry-runs, starts (optionally scoped with `--repo` or `--workflow`), inspects, resumes and opens the report of a dream through the installed `dream` command and `dream api` only, so it works from any directory and installs in another harness by copying the folder. `dream report --open` opens the report in the default browser on request.
 - Portable end-to-end test (task 31): a dream runs through the real `dream` command and detached process with a session source, backend, instruction set and store outside any agentic-coding checkout, no skills and no target repository. It retains knowledge, researches, authors a learning recommendation, writes its report and exports; the export imports into a second fresh store and exports again unchanged, keeping identifiers, scopes, availability markers, dismissals and forgotten sessions. The fake `claude` gains a `responder` scenario key and the fake `apsis` a `sessions_dir`.
 - Source availability (13.7): each dream's planner marks evidence `unavailable` when its session is no longer listed, `changed` when the session is smaller than when read, and `available` again when it returns.
@@ -19,6 +21,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- Store migrations refuse any statement other than creating a table or index or adding a column, and leave the store unchanged (Q141).
+- A dry run and `dream trial reader` read a private copy of the store and its WAL, so they no longer write the store's `-shm` or checkpoint a killed dream's WAL into it (Q142).
+- The detached dream process waits until `dream run` has recorded its process group before doing any work, and exits having done nothing if the starting process died first (Q143).
 - The detached dream process now runs the real phases by run kind: Read, Review, Research, Author and Adopt (with the replay gate) for a dream, Research and Author for a currency review, all loaded from the run's instruction snapshot, and writes the report on exit. A process that cannot load its instructions leaves the run interrupted with the reason.
 - The shared MCP definitions are optional: a role tool whose server is not defined, or with no definitions file, is left out of the call and listed in the report instead of failing the call and stopping the dream.
 - `dream run --repo` and `--project` take relative paths from the caller's directory, not the dream's home.

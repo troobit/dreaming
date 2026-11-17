@@ -207,6 +207,48 @@ def test_a_live_process_reusing_the_recorded_group_id_is_left_alone(
         unrelated.wait()
 
 
+def test_the_child_starts_work_only_once_its_process_group_is_recorded(
+    home, cfg, children, tmp_path
+):
+    seen = tmp_path / "seen"
+    child = children(f"""
+        import os, pathlib, sqlite3, sys
+        run_id, args = sys.argv[1], sys.argv[2:]
+        ready = int(args[args.index("--ready-fd") + 1])
+        assert os.read(ready, 1) == b"1"
+        conn = sqlite3.connect("dreaming.db")
+        row = conn.execute(
+            "SELECT process_group FROM runs WHERE id = ?", (run_id,)
+        ).fetchone()
+        pathlib.Path("{seen}").write_text(f"{{os.getpid()}} {{row[0]}}")
+    """)
+    started = run.start(home, cfg, child=child)
+    assert started.process.wait(timeout=10) == 0
+    pid, group = seen.read_text().split()
+    assert int(pid) == int(group) == started.process.pid
+
+
+def test_a_child_whose_starting_process_died_first_does_nothing(home, cfg):
+    _add(home, cfg, "dream-orphan", status="running")
+    ready, go = os.pipe()
+    os.close(go)
+    fd = run.acquire_lock(home)
+    try:
+        assert (
+            run.child_main(
+                ["dream-orphan", "--lock-fd", str(fd), "--ready-fd", str(ready)]
+            )
+            == 1
+        )
+    finally:
+        os.close(fd)
+    conn = store.open_store(home / "dreaming.db")
+    row = run_row(conn, "dream-orphan")
+    assert (row["status"], row["error"]) == ("running", None)
+    assert steps.load(conn, "dream-orphan") == []
+    conn.close()
+
+
 # Starting and resuming
 
 
@@ -379,8 +421,16 @@ def test_a_child_that_cannot_load_its_instructions_leaves_the_run_interrupted(
     snapshot = config.write_snapshot(home, "dream-broken", cfg)
     run.create_run(conn, "dream-broken", cfg, snapshot_path=str(snapshot))
     fd = run.acquire_lock(home)
+    ready, go = os.pipe()
+    os.write(go, b"1")
+    os.close(go)
     try:
-        assert run.child_main(["dream-broken", "--lock-fd", str(fd)]) == 1
+        assert (
+            run.child_main(
+                ["dream-broken", "--lock-fd", str(fd), "--ready-fd", str(ready)]
+            )
+            == 1
+        )
     finally:
         os.close(fd)
     row = run_row(conn, "dream-broken")

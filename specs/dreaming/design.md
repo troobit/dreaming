@@ -47,7 +47,7 @@ The skill reaches the program only through the installed `dream` command and `dr
 
 ### Versioned installs (7.3)
 
-`make install` installs the committed `HEAD` into `~/.dreaming/versions/<revision>/` and repoints `~/.dreaming/current`. `~/.local/bin/dream` is a launcher that runs `current` for a new run and the run's recorded revision on resume; while a run is unfinished, every invocation runs that run's version (Q87). Adoption of dreaming's own code deploys a new version for the next run; the running or resumed run keeps its revision. A version directory is deleted only when no unfinished run records it. Schema migrations are additive within a major version and run only when no unfinished run exists; otherwise the newer command refuses with `migration_blocked` naming the run.
+`make install` installs the committed `HEAD` into `~/.dreaming/versions/<revision>/` and repoints `~/.dreaming/current`. `~/.local/bin/dream` is a launcher that runs `current` for a new run and the run's recorded revision on resume; while a run is unfinished, every invocation runs that run's version (Q87). Adoption of dreaming's own code deploys a new version for the next run; the running or resumed run keeps its revision. A version directory is deleted only when no unfinished run records it. Schema migrations are additive within a major version, which the migration code enforces (Q141), and run only when no unfinished run exists; otherwise the newer command refuses with `migration_blocked` naming the run.
 
 ### Instruction set and snapshot (7.1, 7.3)
 
@@ -132,7 +132,7 @@ Contract: a step's follow-up steps are inserted in the same SQLite transaction t
 Start sequence:
 1. The `dream start` parent opens the lock file and calls `flock(LOCK_EX | LOCK_NB)`. If another process holds it, the parent exits 4 naming the running dream from the `runs` row and changes nothing.
 2. The parent inserts the run row (`running`) and spawns the detached child in a new session with the lock descriptor inherited (`pass_fds`). The child's descriptor refers to the same open file description, so the lock is held continuously from step 1; no other start can take it between parent and child.
-3. The parent closes its descriptor and returns the run id. The lock stays held by the child until it exits or dies.
+3. The parent records the child's process group, then lets it begin by writing to a pipe the child waits on; a child whose parent dies first reads end of file and exits having done nothing (Q143). The parent closes its descriptor and returns the run id. The lock stays held by the child until it exits or dies.
 
 Every other process spawned by the child (model calls, checks, deploy commands) is started with `close_fds=True` so it does not inherit the descriptor. A surviving grandchild would otherwise keep the lock after the child died and block resume.
 

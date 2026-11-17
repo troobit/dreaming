@@ -1,6 +1,8 @@
 """The SQLite store: schema, WAL and additive migrations (6.x, 7.5, 13.x)."""
 
 import sqlite3
+import subprocess
+import sys
 import threading
 import time
 
@@ -92,11 +94,57 @@ def test_reopening_is_a_no_op(tmp_path):
 def test_every_migration_statement_is_additive():
     for number, script in enumerate(store.MIGRATIONS, start=1):
         for statement in store.statements(script):
-            words = statement.upper().split()
-            additive = words[:2] in (["CREATE", "TABLE"], ["CREATE", "INDEX"]) or (
-                words[:2] == ["ALTER", "TABLE"] and words[3:5] == ["ADD", "COLUMN"]
-            )
-            assert additive, f"migration {number}: {statement}"
+            assert store.additive(statement), f"migration {number}: {statement}"
+
+
+@pytest.mark.parametrize(
+    "statement",
+    [
+        "CREATE TABLE notes (id TEXT)",
+        "create unique index runs_kind on runs (kind)",
+        "ALTER TABLE runs ADD COLUMN note TEXT",
+        "ALTER TABLE runs ADD note TEXT",
+    ],
+)
+def test_creating_and_adding_columns_are_additive(statement):
+    assert store.additive(statement)
+
+
+@pytest.mark.parametrize(
+    "statement",
+    [
+        "DROP TABLE runs",
+        "ALTER TABLE runs DROP COLUMN error",
+        "ALTER TABLE runs RENAME COLUMN error TO failure",
+        "ALTER TABLE runs RENAME TO dreams",
+        "UPDATE runs SET status = 'complete'",
+        "DELETE FROM calls",
+        "CREATE VIEW recent AS SELECT * FROM runs",
+    ],
+)
+def test_other_statements_are_not_additive(statement):
+    assert not store.additive(statement)
+
+
+def test_a_non_additive_migration_is_refused_and_changes_nothing(tmp_path):
+    path = tmp_path / "dreaming.db"
+    conn = store.open_store(path)
+    _insert_run(conn, "r1", "complete")
+    conn.close()
+
+    extra = [
+        *store.MIGRATIONS,
+        "ALTER TABLE runs ADD COLUMN note TEXT; ALTER TABLE runs DROP COLUMN error;",
+    ]
+    with pytest.raises(DreamingError) as excinfo:
+        store.open_store(path, migrations=extra)
+    assert excinfo.value.code == "incompatible_version"
+    assert f"migration {len(extra)} is not additive" in excinfo.value.message
+
+    conn = store.open_store(path)
+    assert "note" not in _columns(conn, "runs")
+    assert "error" in _columns(conn, "runs")
+    conn.close()
 
 
 def test_an_added_migration_keeps_existing_data(tmp_path):
@@ -192,6 +240,50 @@ def test_a_second_connection_can_write_while_a_run_holds_a_transaction(tmp_path)
     assert reader.execute("SELECT COUNT(*) FROM feedback").fetchone()[0] == 1
     run_conn.close()
     reader.close()
+
+
+def _store_files(path):
+    return {p.name: p.read_bytes() for p in sorted(path.parent.glob(f"{path.name}*"))}
+
+
+def test_a_memory_copy_reads_a_wal_left_by_a_dead_writer_and_changes_no_file(
+    tmp_path,
+):
+    """Opening the store itself would checkpoint the WAL into it on close and
+    delete it (1.7)."""
+    path = tmp_path / "dreaming.db"
+    store.open_store(path).close()
+    writer = (
+        "import os, sys\n"
+        "from pathlib import Path\n"
+        "from dreaming import store\n"
+        "conn = store.open_store(Path(sys.argv[1]))\n"
+        'conn.execute("INSERT INTO runs (id, status, revision, started_at)'
+        " VALUES ('r1', 'interrupted', 'abc123', '2026-11-14T00:00:00Z')\")\n"
+        "os._exit(0)\n"
+    )
+    subprocess.run([sys.executable, "-c", writer, str(path)], check=True)
+    before = _store_files(path)
+    assert "dreaming.db-wal" in before
+
+    copy = store.memory_copy(path)
+    try:
+        row = copy.execute("SELECT id, status FROM runs").fetchone()
+        assert tuple(row) == ("r1", "interrupted")
+    finally:
+        copy.close()
+    assert _store_files(path) == before
+
+
+def test_a_memory_copy_of_no_store_is_empty_and_creates_nothing(tmp_path):
+    empty = tmp_path / "empty"
+    empty.mkdir()
+    copy = store.memory_copy(empty / "dreaming.db")
+    try:
+        assert copy.execute("SELECT COUNT(*) FROM runs").fetchone()[0] == 0
+    finally:
+        copy.close()
+    assert list(empty.iterdir()) == []
 
 
 def test_transaction_rolls_back_on_error(db):

@@ -13,7 +13,7 @@ Tasks 1–5 of `specs/dreaming/tasks.md`.
 
 - Connections use `sqlite3.connect(..., autocommit=True)` and explicit `BEGIN IMMEDIATE`/`COMMIT` via `store.transaction()`. Under the default legacy mode, `executescript` commits any open transaction first, which would make migrations non-atomic.
 - `migrate` checks `user_version` without a lock first, so opening an up-to-date store never waits on a running dream's write transaction.
-- Migrations must be additive; `test_every_migration_statement_is_additive` enforces CREATE TABLE/INDEX or ALTER TABLE ADD COLUMN only.
+- Migrations must be additive: `store.additive` allows only CREATE TABLE/INDEX or ALTER TABLE ADD COLUMN. `migrate` refuses any other statement (`incompatible_version`, the transaction rolls back), and `test_every_migration_statement_is_additive` checks the shipped migrations with the same rule.
 - Observations are de-duplicated by `UNIQUE (source, session_id, entry_id, lens, lens_version, quote)`; insert with `INSERT OR IGNORE`.
 
 ## Config (`config.py`)

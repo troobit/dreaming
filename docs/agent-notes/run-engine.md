@@ -4,8 +4,9 @@ Tasks 8–10 of `specs/dreaming/tasks.md`: `steps.py`, `budget.py`, `run.py`, `p
 
 ## How a run executes
 
-- `run.start` (the invoking process) takes `~/.dreaming/lock` with a non-blocking `flock`, creates or resumes the run row inside one transaction, spawns `python -I -m dreaming.run <id> --lock-fd N` with `pass_fds` and `start_new_session=True`, records the child's pid as `runs.process_group`, then closes its own descriptor. Tests pass `child=[...]` to swap in fake child programs.
-- The child (`run.child_main`) marks the descriptor non-inheritable, re-locks it (a no-op on the same open file description), builds a `Runner` from the run's snapshot config plus `runs.overrides` (`run.run_config`), and exits with `run.exit_code(status)`. Its stdout and stderr go to `runs/<id>/run.log`.
+- `run.start` (the invoking process) takes `~/.dreaming/lock` with a non-blocking `flock`, creates or resumes the run row inside one transaction, spawns `python -I -m dreaming.run <id> --lock-fd N --ready-fd R` with `pass_fds` and `start_new_session=True`, records the child's pid as `runs.process_group`, writes one byte to the ready pipe, then closes its own descriptors. Tests pass `child=[...]` to swap in fake child programs; fakes ignore their arguments.
+- The ready pipe closes the gap between spawning and recording the group: the child blocks on `--ready-fd` before doing anything, so a resume can always find the group to kill. If `start` dies or the `UPDATE` fails first, the child reads end of file, logs it and exits 1 with nothing done; the run stays `running` and the next start resumes it.
+- The child (`run.child_main`) marks the descriptor non-inheritable, waits on the ready pipe, re-locks the lock descriptor (a no-op on the same open file description), builds a `Runner` from the run's snapshot config plus `runs.overrides` (`run.run_config`), and exits with `run.exit_code(status)`. Its stdout and stderr go to `runs/<id>/run.log`.
 - `run.wiring(home, row, cfg)` builds the child's handlers from the run's snapshot (`<snapshot>/instructions`) and `Apsis.from_config`: `author`, `adopt` (with a `ReplayGate`) and, by `runs.kind`, either `read`/`review`/`research` with `ReadPhase.plan` as planner, or `research` = `CurrencyPhase` with `currency.plan`. The report is `report.Writer(home, cfg)`. A `DreamingError` while wiring (for example a snapshot without role prompts) leaves the run `interrupted` with the message and exits 1.
 - Tests that start the real child need the shipped instruction set (`runkit.instruction_set`) and the `fakes` fixture for `apsis`; set `report.open_browser = false` when the requester is `user`, or the child opens a real browser.
 - A phase is an object with `prepare(ctx, step)` (outside any transaction; makes calls through `ctx.call`) and `apply(conn, step, prepared) -> Outcome` (inside the step's transaction). The runner adds `Outcome.follow_up` and marks the step in that same transaction. An optional `failed(conn, step, reason)` runs in the transaction that marks a step `failed` after `InputFailed`.
@@ -36,7 +37,7 @@ Tasks 8–10 of `specs/dreaming/tasks.md`: `steps.py`, `budget.py`, `run.py`, `p
 
 ## Dry run and plan view
 
-- `run.dry_run` reads the store through `store.memory_copy` (an in-memory backup, migrated), never `open_store`, so it creates no db, home or WAL file and changes no row. Backend status comes from `probe.cached_status` (`--version` plus the cache).
+- `run.dry_run` reads the store through `store.memory_copy` (an in-memory backup, migrated), never `open_store`, so it creates no db, home or WAL file and changes no row. `memory_copy` backs up from a private copy of the db and its `-wal`, because opening the real store would write its `-shm` and checkpoint a WAL left by a killed dream into the db (`python.md`). Backend status comes from `probe.cached_status` (`--version` plus the cache).
 - `plan.write` renders `runs/<id>/tasks-dream.md`; failed and skipped steps are `[x]` with the state in the title, running is `[-]`. Nothing reads the file back.
 
 ## Versioned installs

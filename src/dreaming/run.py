@@ -3,8 +3,9 @@
 `start` runs in the invoking process. It takes the lock, records the run and
 spawns a detached child in a new session that inherits the lock descriptor, so
 the lock is held without a gap until the child exits or dies (design, Lock).
-The child (`python -m dreaming.run <id> --lock-fd <fd>`) runs `Runner.execute`
-and exits with the run's exit code.
+The child (`python -m dreaming.run <id> --lock-fd <fd> --ready-fd <fd>`) waits
+until `start` has recorded its process group, then runs `Runner.execute` and
+exits with the run's exit code.
 
 The loop takes the next ready step, lets its phase make its calls through a
 `Context`, and applies the result in one transaction with the step's follow-up
@@ -761,14 +762,17 @@ def _resume(
     return merged
 
 
-def _spawn(home: Path, run_id: str, fd: int, child: Sequence[str]) -> subprocess.Popen:
-    """The detached child: a new session that inherits the lock descriptor."""
+def _spawn(
+    home: Path, run_id: str, fd: int, ready: int, child: Sequence[str]
+) -> subprocess.Popen:
+    """The detached child: a new session that inherits the lock descriptor and
+    the read end of the pipe it waits on before doing any work."""
     path = home / "runs" / run_id / "run.log"
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "a") as output:
         return subprocess.Popen(
-            [*child, run_id, "--lock-fd", str(fd)],
-            pass_fds=(fd,),
+            [*child, run_id, "--lock-fd", str(fd), "--ready-fd", str(ready)],
+            pass_fds=(fd, ready),
             start_new_session=True,
             cwd=home,
             stdin=subprocess.DEVNULL,
@@ -831,17 +835,30 @@ def start(
                     run_id = row["id"]
                     overrides = _resume(conn, row, selection, overrides)
                     selection = json.loads(row["selection"])
+            ready, go = os.pipe()
             try:
-                process = _spawn(home, run_id, fd, child or CHILD)
-            except OSError as exc:
+                try:
+                    process = _spawn(home, run_id, fd, ready, child or CHILD)
+                except OSError as exc:
+                    conn.execute(
+                        "UPDATE runs SET status = 'interrupted', error = ?"
+                        " WHERE id = ?",
+                        (f"could not start: {exc}", run_id),
+                    )
+                    raise DreamingError(
+                        f"could not start dream {run_id}: {exc}"
+                    ) from exc
                 conn.execute(
-                    "UPDATE runs SET status = 'interrupted', error = ? WHERE id = ?",
-                    (f"could not start: {exc}", run_id),
+                    "UPDATE runs SET process_group = ? WHERE id = ?",
+                    (process.pid, run_id),
                 )
-                raise DreamingError(f"could not start dream {run_id}: {exc}") from exc
-            conn.execute(
-                "UPDATE runs SET process_group = ? WHERE id = ?", (process.pid, run_id)
-            )
+                # The child does no work before this byte, so a resume can always
+                # find its group. If this process dies first, the child reads end
+                # of file and exits.
+                os.write(go, b"1")
+            finally:
+                os.close(ready)
+                os.close(go)
         finally:
             conn.close()
     finally:
@@ -1138,10 +1155,17 @@ def child_main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="python -m dreaming.run")
     parser.add_argument("run_id")
     parser.add_argument("--lock-fd", type=int, required=True)
+    parser.add_argument("--ready-fd", type=int, required=True)
     args = parser.parse_args(argv)
     # The parent took the lock on this descriptor; nothing this process starts
     # may inherit it.
     os.set_inheritable(args.lock_fd, False)
+    # The parent writes one byte once it has recorded this process group.
+    ready = os.read(args.ready_fd, 1)
+    os.close(args.ready_fd)
+    if ready != b"1":
+        log(f"dream {args.run_id}: the starting process exited before recording it")
+        return FAILURE
     try:
         fcntl.flock(args.lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
     except BlockingIOError:
