@@ -1,3 +1,6 @@
 specs/**/.orbit
 .worktrees/**
 specs/**/comparison-report
+**scratchfile**
+scratch.md
+
