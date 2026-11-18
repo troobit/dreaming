@@ -11,8 +11,5 @@
 
 ## Outstanding
 
-- [ ] 3. dreaming: 94 tasks outstanding, 92 blocked
-  - specs/dreaming/tasks.md, 2026-11-14 → run: /next-task
-
-- [ ] 4. dry: 13 tasks outstanding, 8 blocked
+- [ ] 3. dry: 13 tasks outstanding, 8 blocked
   - specs/dry/tasks.md, 2026-11-14 → run: /next-task

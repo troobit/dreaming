@@ -1,0 +1,98 @@
+# Example ~/.dreaming/config.toml. Every setting is optional; the values shown
+# are examples, and `dream config` prints the effective configuration.
+
+[budget]
+sessions = 50                 # sessions read per dream (1.2)
+tokens = 2000000              # every role, retry and fallback counts
+wall_clock_minutes = 240      # time the dream process runs; usage-limit waits do not count
+review_author_reserve = 0.3   # share of tokens kept for review and authoring
+
+[thresholds]
+min_sessions = 3                  # distinct sessions before an inferred pattern is eligible (4.5)
+max_usage_wait_minutes = 300      # wait for a provider usage limit to reset up to this long (5.3)
+fallback_on_usage_limit = false   # true: move to the role's next backend instead of waiting
+
+[adoption]
+auto_apply = true   # merge and deploy when every configured check passes (9.7)
+
+[instructions]
+repo = "~/repos/dreaming"   # instructions/ is read from this repository's default branch
+branch = "main"
+
+[scan]
+names_file = "~/.config/dreaming/names.txt"   # outside every repository (9.12)
+
+# The shared MCP definitions, optional: without them, or without a server a
+# role names, calls go on without those tools and the report lists them. A
+# call gets only the servers and tools its role lists; a server's secret is
+# read from <SERVER>_<SECRET> in the environment, for example
+# GITHUB_AUTH_TOKEN="Bearer <token>" for the GitHub server.
+[mcp]
+servers_file = "~/repos/agentic-coding/mcp/servers.json"
+
+# Tools per role: file tools (read, grep, glob, edit, write) or <server>.<tool>.
+# Readers, reviewers and replayers get none (4.4); agent-launching tools are
+# refused.
+[tools]
+researcher = [
+  "read", "grep", "glob",
+  "devtools.internet_search", "devtools.fetch_url",
+  "github.pull_request_read",   # pull-request review threads (4.6)
+]
+author = ["read", "grep", "glob", "edit", "write"]
+
+# Backends: a harness (claude, codex) or a direct LM Studio model for tool-free roles.
+[backends.claude]
+harness = "claude"
+model = "sonnet"
+context_tokens = 200000
+
+[backends.codex-local]
+harness = "codex"
+provider = "lmstudio"
+model = "qwen3-coder-30b"
+context_tokens = 32768
+
+[backends.lmstudio]
+harness = "lmstudio"
+model = "qwen3-30b-a3b"
+base_url = "http://localhost:1234"
+context_tokens = 32768
+
+# Per-role fallback lists; inputs are sized for the smallest context listed (5.2).
+[roles.reader]
+backends = ["lmstudio", "claude"]
+
+[roles.researcher]
+backends = ["claude", "codex-local"]
+
+# Local or cloud, by recorded provider or model; earlier rules win (2.2).
+[[classification.rules]]
+model = "gpt-oss-*"
+locality = "local"
+
+# Client origins that mark tool-started sessions (2.9).
+[origins.claude]
+interactive = ["cli", "claude-vscode", "claude-desktop"]
+non_interactive = ["sdk-cli", "sdk-ts", "sdk-py"]
+
+# Work domains by project path or source (2.3).
+[domains.projects]
+"~/repos" = "software"
+
+[domains.sources]
+lmstudio = "general"
+
+# Skills, rules and workflows that `dream run --currency` checks against current
+# sources (16.1); each is <repository>:<path>. Changes stay on the dream branch.
+[currency]
+targets = ["agentic-coding:claude/rules/language-rules/python.md"]
+
+# Target repositories for changes (9.x); no lint and test commands means proposal-only.
+[repositories.agentic-coding]
+path = "~/repos/agentic-coding"
+public = true
+generate = ["make generate"]
+lint = ["make lint"]
+test = ["make test"]
+deploy = ["make deploy"]

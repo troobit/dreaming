@@ -1,0 +1,312 @@
+{
+  "type": "object",
+  "properties": {
+    "assignments": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "cluster": {
+            "type": "string",
+            "description": "A new cluster's key."
+          },
+          "pattern_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The existing pattern it belongs to, or null for a new pattern."
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "cluster",
+          "pattern_id",
+          "reason"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "pattern_merges": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "pattern_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Existing patterns that describe the same thing."
+          },
+          "into": {
+            "type": "string",
+            "description": "The pattern id to keep."
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "pattern_ids",
+          "into",
+          "reason"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "knowledge": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "op": {
+            "type": "string",
+            "enum": [
+              "create",
+              "revise",
+              "supersede",
+              "contest",
+              "dismiss",
+              "confirm"
+            ]
+          },
+          "item_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The item acted on; null only for create."
+          },
+          "base_version": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "The item version this operation read; null only for create."
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "preference",
+              "lesson",
+              "workflow",
+              "learning"
+            ]
+          },
+          "content": {
+            "type": "string",
+            "description": "The interpretation, as one or two plain sentences."
+          },
+          "scope": {
+            "type": "object",
+            "description": "Where the item applies; missing scope is never global.",
+            "properties": {
+              "domains": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "projects": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "workflows": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "global": {
+                "type": "boolean",
+                "description": "True only when the evidence shows the item applies everywhere."
+              },
+              "unresolved": {
+                "type": "boolean",
+                "description": "True when the evidence does not show where the item applies."
+              }
+            },
+            "required": [
+              "domains",
+              "projects",
+              "workflows",
+              "global",
+              "unresolved"
+            ],
+            "additionalProperties": false
+          },
+          "confidence": {
+            "type": "string",
+            "enum": [
+              "low",
+              "medium",
+              "high"
+            ]
+          },
+          "confidence_basis": {
+            "type": "string",
+            "description": "The counts and outcomes the confidence rests on."
+          },
+          "supporting": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Evidence ids that support the item."
+          },
+          "contradicting": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Evidence ids that count against it."
+          },
+          "pattern": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The pattern id or new cluster key the item rests on, or null."
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "op",
+          "item_id",
+          "base_version",
+          "kind",
+          "content",
+          "scope",
+          "confidence",
+          "confidence_basis",
+          "supporting",
+          "contradicting",
+          "pattern",
+          "reason"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "item_merges": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "item_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Items that state the same interpretation in the same scope."
+          },
+          "into": {
+            "type": "string",
+            "description": "The item id to keep."
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "item_ids",
+          "into",
+          "reason"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "candidates": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "pattern": {
+            "type": "string",
+            "description": "The pattern id or new cluster key."
+          },
+          "proposal": {
+            "type": "string",
+            "enum": [
+              "change",
+              "learning"
+            ]
+          },
+          "repo": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The configured repository a change targets, or null."
+          },
+          "summary": {
+            "type": "string",
+            "description": "What should change or be learned, in one sentence."
+          },
+          "evidence": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Evidence ids the candidate rests on."
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "pattern",
+          "proposal",
+          "repo",
+          "summary",
+          "evidence",
+          "reason"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "questions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "question": {
+            "type": "string",
+            "description": "One question a researcher can answer from repositories, pull requests or the web."
+          },
+          "candidate": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "The index in candidates this question serves, or null."
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "question",
+          "candidate",
+          "reason"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": [
+    "assignments",
+    "pattern_merges",
+    "knowledge",
+    "item_merges",
+    "candidates",
+    "questions"
+  ],
+  "additionalProperties": false
+}

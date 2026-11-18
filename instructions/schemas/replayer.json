@@ -1,0 +1,21 @@
+{
+  "type": "object",
+  "properties": {
+    "response": {
+      "type": "string",
+      "description": "Your first reply to the request, as you would send it."
+    },
+    "plan": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "The steps you would take next, in order."
+    }
+  },
+  "required": [
+    "response",
+    "plan"
+  ],
+  "additionalProperties": false
+}

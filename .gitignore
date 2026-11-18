@@ -3,4 +3,9 @@ specs/**/.orbit
 specs/**/comparison-report
 **scratchfile**
 scratch.md
-
+.venv/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+.hypothesis/
+dist/

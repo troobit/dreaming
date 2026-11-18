@@ -276,4 +276,4 @@ Delivered by orbit specs `apsis-shared-json` and `apsis-lmstudio-logs`, merged o
 
 ## Status
 
-Requirements approved 2026-11-07; amended and re-approved 2026-11-14 (2.11, 4.2, 4.4, 9.7, 9.16–9.19, 14.1, 14.3, 15.2, 16). Design is drafted in `design.md`; implementation has not started. Section 3 is delivered on orbit main at `4bf9776` (see `decision_log.md` Q65).
+Requirements approved 2026-11-07; amended and re-approved 2026-11-14 (2.11, 4.2, 4.4, 9.7, 9.16–9.19, 14.1, 14.3, 15.2, 16). Design is in `design.md`; implementation is complete (tasks 1–31 in `tasks.md`). Section 3 is delivered on orbit main at `4bf9776` (see `decision_log.md` Q65).
